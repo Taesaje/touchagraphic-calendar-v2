@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-ivory: #F5F2EA;
+  --color-ivory-dark: #EAE5D8;
+  --color-ink: #1A1A1A;
+  --color-ink-mid: #3D3D3D;
+  --color-ink-light: #6A6A6A;
+  --color-ink-faint: #C8C4BB;
+  --color-accent: #D65A34;
+  --color-accent-dark: #B84A28;
+  --font-family-serif: 'Noto Serif KR', 'Georgia', serif;
+  --font-family-sans: 'Noto Sans KR', 'Arial', sans-serif;
+  --font-family-mono: 'Courier New', 'Courier', monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #FFFFFF;
+  color: #111111;
+  font-family: 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+::selection {
+  background: #1A1A1A;
+  color: #F5F2EA;
+}
+
+/* 견적서 슬립 — 상단 천공 효과 */
+.slip-perf {
+  position: relative;
+  overflow: visible;
+}
+.slip-perf::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background-image: radial-gradient(circle 11px, #dbd7c8 99%, transparent 100%);
+  background-size: 24px 22px;
+  background-position: 0 -11px;
+  background-repeat: repeat-x;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Portfolio 카드 hover — image wrapper 만 transform/shadow 로 앞으로 떠오름.
+   width/height/margin 은 불변이라 옆 카드가 전혀 밀리지 않는다. caption 은 scale 안 함.
+   enter ~300ms / leave ~220ms, ease-out (bounce 없음). */
+.pf-card {
+  position: relative;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .pf-card:hover {
+    transform: scale(1.06) translateY(-3px);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.14);
+    z-index: 10;
+    transition-duration: 300ms;
+    will-change: transform;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-card { transition: none; }
+  .pf-card:hover { transform: none; box-shadow: none; }
+}
+
+/* Service row hover — 우측 orange arrow 만 살짝 오른쪽으로 + divider 아주 미세하게 진해짐.
+   row / 다른 요소는 불변(layout shift 없음). 실제 link 아님 → cursor pointer / underline / background 효과 없음. */
+.svc-arrow {
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.svc-row {
+  transition: border-color 240ms ease-out;
+}
+@media (hover: hover) and (pointer: fine) {
+  .svc-row:hover .svc-arrow {
+    transform: translateX(6px);
+  }
+  .svc-row:hover {
+    border-bottom-color: rgba(0, 0, 0, 0.5);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .svc-arrow, .svc-row { transition: none; }
+  .svc-row:hover .svc-arrow { transform: none; }
+}
+
+/* FAQ accordion — 답변 패널 height(JS 실측 scrollHeight)를 0↔auto 로 부드럽게 (bounce 없음).
+   panel 아래 Contact 가 자연스럽게 밀려 내려가고 올라옴. 초기값은 닫힘. */
+.faq-panel {
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: height 280ms ease, opacity 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .faq-panel { transition: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   프로토타입 안정화 — 레이아웃 / 타이포그래피 시스템
+   시각 방향은 변경하지 않는다. 역할별 크기·간격만 페이지 전체에서 통일한다.
+   · vw 기반 clamp()로 desktop~mobile 사이를 fluid 하게 축소
+   · 앱 곳곳의 하드코딩된 fontSize / padding 을 이 클래스들로 대체
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 공통 셸: fluid 좌우 padding + 넓은 max-width (중앙 뭉침 방지) ── */
+.u-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1920px;
+  padding-inline: clamp(20px, 5vw, 100px);
+}
+/* full-bleed 가로 레일의 콘텐츠 시작선을 셸과 일치시키는 좌우 padding */
+.u-rail-pad {
+  padding-inline: clamp(20px, 5vw, 100px);
+}
+
+/* ── 섹션 세로 리듬 (인접 섹션 padding이 합쳐지는 점을 감안한 값) ── */
+.u-section    { padding-block: clamp(60px, 7.5vw, 116px); }  /* 일반 대형 섹션 */
+.u-section-sm { padding-block: clamp(44px, 5.5vw, 96px); }   /* 밀도가 높은 섹션(견적) */
+.u-hero-pad   { padding-block: clamp(52px, 6.5vw, 100px); }  /* Hero — 상단은 고정 헤더 pt-13 위에 추가 */
+.u-head-gap   { margin-top: clamp(36px, 4.5vw, 64px); }      /* 섹션 제목 → 본문 */
+
+/* ── 타이포그래피 역할 스케일 ── */
+.t-hero {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 700;
+  font-size: clamp(30px, 5.2vw, 88px);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.t-section {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 4.4vw, 76px);
+  line-height: 1.14;
+  letter-spacing: -0.03em;
+}
+.t-display {
+  font-family: 'Noto Serif KR', 'Georgia', serif;
+  font-weight: 700;
+  font-size: clamp(24px, 3.8vw, 60px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.t-item {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 700;
+  font-size: clamp(20px, 2.4vw, 38px);
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+.t-support {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 700;
+  font-size: clamp(15px, 1.35vw, 22px);
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+.t-lead {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 400;
+  font-size: clamp(14px, 1vw, 16px);
+  line-height: 1.8;
+}
+.t-body {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 400;
+  font-size: clamp(13px, 0.95vw, 15px);
+  line-height: 1.7;
+}
+.t-caption {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 400;
+  font-size: clamp(11px, 0.85vw, 12.5px);
+  line-height: 1.55;
+}
+.t-label {
+  font-family: 'Noto Sans KR', 'Arial', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+.t-meta {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}

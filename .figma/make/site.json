@@ -1,0 +1,10 @@
+{
+  "description": "This responsive landing page allows businesses and organizations to explore estimated pricing for custom calendars by selecting production quantities, material readiness, and design levels, ultimately facilitating consultation requests.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2027 브랜드 캘린더 · 견적 계산기</title>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e6e3d8;
+    --bg-dark:#dbd7c8;
+    --paper:#faf9f4;
+    --ink:#1c1c1e;
+    --accent:#d6392c;
+    --accent-soft:#f3d9d5;
+    --cyan:#0090c8;
+    --magenta:#c81d78;
+    --yellow:#e0b400;
+    --line:#d3cfc0;
+    --line-strong:#b9b4a1;
+    --muted:#787468;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(28,28,30,0.05) 1px, transparent 0);
+    background-size:22px 22px;
+    color:var(--ink);
+    font-family:'Pretendard Variable','Pretendard',-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding:32px 20px 80px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  /* ---------- header ---------- */
+  .masthead{
+    max-width:1080px;
+    margin:0 auto 28px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;
+  }
+  .masthead-left .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .dots{display:inline-flex;gap:4px;}
+  .dots span{width:6px;height:6px;border-radius:50%;display:inline-block;}
+  .dots .c{background:var(--cyan);}
+  .dots .m{background:var(--magenta);}
+  .dots .y{background:var(--yellow);}
+  .dots .k{background:var(--ink);}
+  .masthead h1{
+    font-size:clamp(24px,3.4vw,34px);
+    margin:0;
+    letter-spacing:-0.01em;
+    line-height:1.2;
+  }
+  .masthead .desc{
+    max-width:320px;
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+
+  /* ---------- layout ---------- */
+  .stage{
+    max-width:1080px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:28px;
+    align-items:start;
+  }
+  @media (max-width:820px){
+    .stage{grid-template-columns:1fr;}
+  }
+
+  /* ---------- left: control panel ---------- */
+  .panel{}
+  .step{margin-bottom:26px;}
+  .step-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.1em;
+    color:var(--muted);
+    margin-bottom:10px;
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  .step-label b{color:var(--ink);font-size:12px;}
+
+  .tabs{
+    display:flex;
+    gap:0;
+    border-bottom:1px solid var(--line-strong);
+  }
+  .tab{
+    flex:1;
+    text-align:left;
+    background:transparent;
+    border:none;
+    border-bottom:3px solid transparent;
+    padding:12px 10px 12px 2px;
+    cursor:pointer;
+    font-family:inherit;
+    color:var(--muted);
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .tab .tab-name{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px;}
+  .tab .tab-price{display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .tab.active{border-bottom-color:var(--accent);}
+  .tab.active .tab-price{color:var(--accent);}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .tab:not(.active):hover .tab-name{color:var(--accent);}
+
+  .tier-subtitle{
+    font-size:12px;
+    color:var(--muted);
+    margin:12px 0 0;
+    line-height:1.6;
+  }
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  select, .select-wrap{
+    width:100%;
+  }
+  select{
+    width:100%;
+    appearance:none;
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    padding:9px 32px 9px 10px;
+    font-family:inherit;
+    font-size:13.5px;
+    color:var(--ink);
+    background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size:5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+  }
+  select:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .addon-box{
+    border:1px dashed var(--line-strong);
+    border-radius:var(--radius);
+    padding:14px;
+    margin-top:4px;
+  }
+  .addon-toggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .addon-toggle input{
+    width:16px;height:16px;
+    accent-color:var(--accent);
+  }
+  .addon-toggle .t-name{font-size:13.5px;font-weight:600;}
+  .addon-toggle .t-note{font-size:11.5px;color:var(--muted);display:block;margin-top:2px;}
+
+  .slider-row{
+    margin-top:14px;
+    display:none;
+  }
+  .slider-row.show{display:block;}
+  .slider-row .srow-top{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12px;color:var(--muted);margin-bottom:6px;
+  }
+  .slider-row .srow-top b.mono{color:var(--accent);font-size:13px;}
+  input[type=range]{
+    width:100%;
+    accent-color:var(--accent);
+    height:4px;
+  }
+
+  .rules{
+    border-top:1px solid var(--line);
+    padding-top:14px;
+    margin-top:22px;
+  }
+  .rules ul{list-style:none;margin:0;padding:0;}
+  .rules li{
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.7;
+    padding-left:14px;
+    position:relative;
+  }
+  .rules li::before{
+    content:'—';
+    position:absolute;left:0;
+    color:var(--line-strong);
+  }
+
+  /* ---------- right: quote slip ---------- */
+  .slip-wrap{position:sticky; top:24px;}
+  .slip{
+    background:var(--paper);
+    border:1px solid var(--line-strong);
+    border-radius:var(--radius);
+    padding:26px 24px 22px;
+    position:relative;
+    box-shadow:0 18px 34px -20px rgba(28,28,30,0.35);
+  }
+  .slip::before{
+    content:'';
+    position:absolute;
+    top:-11px; left:0; right:0; height:22px;
+    background-image:radial-gradient(circle 11px, var(--bg) 99%, transparent 100%);
+    background-size:24px 22px;
+    background-position:0 -11px;
+    background-repeat:repeat-x;
+  }
+  .regmark{
+    position:absolute;
+    width:16px;height:16px;
+    opacity:.55;
+  }
+  .regmark svg{width:100%;height:100%;display:block;}
+  .regmark.tl{top:14px; left:14px;}
+  .regmark.tr{top:14px; right:14px;}
+
+  .slip-head{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding-bottom:14px;margin-bottom:14px;
+    border-bottom:2px solid var(--ink);
+  }
+  .slip-head .slip-title{font-size:16px;font-weight:700;letter-spacing:-0.01em;}
+  .slip-head .slip-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+  .slip-head .slip-no{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--muted);
+    text-align:right;
+  }
+
+  .line-item{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:7px 0;
+    font-size:13px;
+    border-bottom:1px dotted var(--line);
+  }
+  .line-item .li-label{color:var(--ink);}
+  .line-item .li-value{font-family:'IBM Plex Mono',monospace;font-size:13px;white-space:nowrap;}
+  .line-item.spec .li-label{color:var(--muted);font-size:12px;}
+  .line-item.spec .li-value{color:var(--muted);font-size:12px;}
+  .line-item.addon .li-label{color:var(--accent);}
+  .line-item.addon .li-value{color:var(--accent);}
+
+  .spec-block{margin-bottom:14px;}
+  .spec-block .sb-title{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;letter-spacing:.1em;color:var(--muted);
+    margin-bottom:4px;
+  }
+
+  .slip-total{
+    margin-top:16px;
+    padding-top:14px;
+    border-top:2px solid var(--ink);
+    display:flex;justify-content:space-between;align-items:baseline;
+  }
+  .slip-total .tt-label{font-size:13px;font-weight:700;}
+  .slip-total .tt-label span{display:block;font-size:10.5px;font-weight:400;color:var(--muted);margin-top:2px;}
+  .slip-total .tt-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:24px;font-weight:600;color:var(--accent);
+  }
+  .slip-total .tt-value small{font-size:13px;font-weight:500;margin-left:2px;}
+  .tt-range{font-size:11px;color:var(--muted);text-align:right;margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+
+  .slip-foot{
+    margin-top:18px;
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  }
+  .copy-btn{
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    border-radius:var(--radius);
+    padding:11px 16px;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    letter-spacing:.02em;
+  }
+  .copy-btn:hover{background:var(--accent);}
+  .copy-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .copy-status{font-size:11.5px;color:var(--muted);}
+  .vat-note{font-size:10.5px;color:var(--muted);margin-top:10px;}
+
+  @media (prefers-reduced-motion:reduce){
+    * {transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+  <header class="masthead">
+    <div class="masthead-left">
+      <div class="eyebrow">
+        <span class="dots"><span class="c"></span><span class="m"></span><span class="y"></span><span class="k"></span></span>
+        PRINT ESTIMATE / 인쇄 견적
+      </div>
+      <h1>2027 브랜드 캘린더<br>견적 계산기</h1>
+    </div>
+    <p class="desc">등급을 고르고 옵션을 조정하면 오른쪽 견적서 금액이 바로 바뀝니다. 표시 금액은 부가세 및 인쇄·배송 실비 별도입니다.</p>
+  </header>
+
+  <div class="stage">
+    <!-- LEFT: controls -->
+    <div class="panel">
+
+      <div class="step">
+        <div class="step-label"><b>01</b> 등급 선택</div>
+        <div class="tabs" id="tabs" role="tablist"></div>
+        <p class="tier-subtitle" id="tierSubtitle"></p>
+      </div>
+
+      <div class="step" id="optionsStep">
+        <div class="step-label"><b>02</b> 옵션</div>
+        <div id="optionsBody"></div>
+      </div>
+
+      <div class="step" id="addonStep">
+        <div class="step-label"><b>03</b> 애드온</div>
+        <div id="addonBody"></div>
+      </div>
+
+      <div class="rules">
+        <div class="step-label" style="margin-bottom:8px;"><b>진행 조건</b></div>
+        <ul id="rulesList"></ul>
+      </div>
+    </div>
+
+    <!-- RIGHT: quote slip -->
+    <div class="slip-wrap">
+      <div class="slip">
+        <div class="regmark tl">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#1c1c1e" stroke-width="1"/><line x1="12" y1="0" x2="12" y2="24" stroke="#1c1c1e" stroke-width="1"/><line x1="0" y1="12" x2="24" y2="12" stroke="#1c1c1e" stroke-width="1"/></svg>
+        </div>
+        <div class="regmark tr">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#1c1c1e" stroke-width="1"/><line x1="12" y1="0" x2="12" y2="24" stroke="#1c1c1e" stroke-width="1"/><line x1="0" y1="12" x2="24" y2="12" stroke="#1c1c1e" stroke-width="1"/></svg>
+        </div>
+
+        <div class="slip-head">
+          <div>
+            <div class="slip-title">견 적 서</div>
+            <div class="slip-sub" id="slipTierName"></div>
+          </div>
+          <div class="slip-no mono">EST. NO.<br><span id="slipDate"></span></div>
+        </div>
+
+        <div id="specBlock" class="spec-block" style="display:none;">
+          <div class="sb-title">SPEC / 선택 사양</div>
+          <div id="specLines"></div>
+        </div>
+
+        <div class="sb-title" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px;">BREAKDOWN / 구성 항목</div>
+        <div id="lineItems"></div>
+
+        <div class="slip-total">
+          <div class="tt-label">합계<span>부가세·인쇄비 별도</span></div>
+          <div style="text-align:right;">
+            <div class="tt-value"><span id="totalValue" class="mono">0</span><small>원</small></div>
+            <div class="tt-range" id="totalRange"></div>
+          </div>
+        </div>
+
+        <div class="slip-foot">
+          <button class="copy-btn" id="copyBtn">견적서 텍스트 복사</button>
+          <span class="copy-status" id="copyStatus"></span>
+        </div>
+        <p class="vat-note">본 견적은 예상 금액이며, 최종 견적은 상담 후 확정됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const won = n => Math.round(n).toLocaleString('ko-KR');
+
+const DATA = {
+  template:{
+    name:'Template Plan',
+    subtitle:'실속형 브랜드 캘린더 (소상공인·스타트업)',
+    breakdown:[
+      {label:'템플릿 이용료', value:100000},
+      {label:'표지 디자인', value:300000},
+      {label:'내지 세팅', value:500000},
+    ],
+    options:{
+      '사이즈':['A · 가로형','B · 세로형','C · 정사각','D · 와이드'],
+      '표지 스타일':['불꽃양 그래픽','2027 타이포그래피'],
+      '내지 레이아웃':['2분할','4분할','5분할','미니 달력형'],
+    },
+    rules:['표지 수정 2회 한정','내지 12p, 사진/텍스트 단순 치환 (레이아웃 변경 불가)','인쇄/배송 실비 별도'],
+  },
+  custom_basic:{
+    name:'Custom Basic',
+    subtitle:'맞춤 기획 및 전용 비주얼 (중견기업·일반 브랜드)',
+    breakdown:[
+      {label:'기획 PT', value:1000000},
+      {label:'표지 디자인', value:1000000},
+      {label:'내지 디자인 (24p)', value:2400000},
+      {label:'AI 비주얼 애드온', value:400000},
+    ],
+    rules:['기획안 3종 제안','인쇄 실비 별도'],
+    addon:{
+      name:'외부 작가 일러스트 협업',
+      note:'컷당 50만~100만원 · 12컷 기준',
+      cuts:12,
+      min:500000,
+      max:1000000,
+      default:750000,
+    },
+  },
+  custom_highend:{
+    name:'Custom High-End',
+    subtitle:'풀 커스텀 하이엔드 솔루션 (대기업·공공기관)',
+    breakdown:[
+      {label:'기획 PT', value:3000000},
+      {label:'키비주얼 표지', value:2000000},
+      {label:'내지 디자인 (24p)', value:4800000},
+    ],
+    rules:['인터뷰/만남 기반 전용 기획, 작가 섭외·디렉팅 총괄','지류/특수 후가공 맞춤 견적'],
+    addon:{
+      name:'작가 협업 (필수 항목)',
+      note:'컷당 50만~100만원 · 13컷 기준',
+      cuts:13,
+      min:500000,
+      max:1000000,
+      default:500000,
+      required:true,
+    },
+  },
+};
+
+const state = {
+  tier:'template',
+  optIndex:{}, // per-tier selected option indices
+  addonOn:{custom_basic:false, custom_highend:true},
+  addonPerCut:{custom_basic:750000, custom_highend:500000},
+};
+
+const tabsEl = document.getElementById('tabs');
+const order = ['template','custom_basic','custom_highend'];
+
+function baseTotal(id){
+  const d = DATA[id];
+  let sum = d.breakdown.reduce((a,b)=>a+b.value,0);
+  if(id==='custom_highend') sum += d.addon.cuts * d.addon.min;
+  return sum;
+}
+
+order.forEach(id=>{
+  const btn = document.createElement('button');
+  btn.className='tab'+(id===state.tier?' active':'');
+  btn.setAttribute('role','tab');
+  btn.dataset.id=id;
+  btn.innerHTML = `<span class="tab-name">${DATA[id].name}</span><span class="tab-price mono">${won(baseTotal(id))}원~</span>`;
+  btn.addEventListener('click', ()=>{ state.tier=id; render(true); });
+  tabsEl.appendChild(btn);
+});
+
+function renderOptions(){
+  const body = document.getElementById('optionsBody');
+  const step = document.getElementById('optionsStep');
+  body.innerHTML='';
+  const d = DATA[state.tier];
+  if(!d.options){ step.style.display='none'; return; }
+  step.style.display='block';
+  if(!state.optIndex[state.tier]) state.optIndex[state.tier]={};
+  Object.entries(d.options).forEach(([label, list])=>{
+    const wrap = document.createElement('div');
+    wrap.className='field';
+    const idKey = label;
+    if(state.optIndex[state.tier][idKey]===undefined) state.optIndex[state.tier][idKey]=0;
+    wrap.innerHTML = `<label>${label}</label>`;
+    const sel = document.createElement('select');
+    list.forEach((opt,i)=>{
+      const o=document.createElement('option');
+      o.value=i; o.textContent=opt;
+      if(i===state.optIndex[state.tier][idKey]) o.selected=true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', e=>{
+      state.optIndex[state.tier][idKey]=parseInt(e.target.value);
+      render(false);
+    });
+    wrap.appendChild(sel);
+    body.appendChild(wrap);
+  });
+}
+
+function renderAddon(){
+  const body = document.getElementById('addonBody');
+  const step = document.getElementById('addonStep');
+  body.innerHTML='';
+  const d = DATA[state.tier];
+  if(!d.addon){ step.style.display='none'; return; }
+  step.style.display='block';
+  const a = d.addon;
+  const box = document.createElement('div');
+  box.className='addon-box';
+
+  if(a.required){
+    box.innerHTML = `<div class="t-name">${a.name}</div><span class="t-note">${a.note}</span>`;
+  } else {
+    const label = document.createElement('label');
+    label.className='addon-toggle';
+    label.innerHTML = `<input type="checkbox" ${state.addonOn[state.tier]?'checked':''}>
+      <span><span class="t-name">${a.name}</span><span class="t-note">${a.note}</span></span>`;
+    label.querySelector('input').addEventListener('change', e=>{
+      state.addonOn[state.tier]=e.target.checked;
+      render(false);
+    });
+    box.appendChild(label);
+  }
+
+  const sliderRow = document.createElement('div');
+  const show = a.required || state.addonOn[state.tier];
+  sliderRow.className = 'slider-row'+(show?' show':'');
+  const perCut = state.addonPerCut[state.tier];
+  sliderRow.innerHTML = `
+    <div class="srow-top"><span>컷당 단가</span><b class="mono">${won(perCut)}원</b></div>
+    <input type="range" min="${a.min}" max="${a.max}" step="50000" value="${perCut}">
+    <div class="srow-top" style="margin-top:6px;"><span>총 ${a.cuts}컷</span><span class="mono">${won(perCut*a.cuts)}원</span></div>
+  `;
+  sliderRow.querySelector('input[type=range]').addEventListener('input', e=>{
+    state.addonPerCut[state.tier]=parseInt(e.target.value);
+    render(false);
+  });
+  box.appendChild(sliderRow);
+  body.appendChild(box);
+}
+
+function renderRules(){
+  const ul = document.getElementById('rulesList');
+  ul.innerHTML='';
+  DATA[state.tier].rules.forEach(r=>{
+    const li=document.createElement('li');
+    li.textContent=r;
+    ul.appendChild(li);
+  });
+}
+
+let lastTotal = null;
+function animateTotal(el, to){
+  const from = lastTotal===null ? to : lastTotal;
+  lastTotal = to;
+  const dur = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 420;
+  if(dur===0){ el.textContent = won(to); return; }
+  const start = performance.now();
+  function step(now){
+    const p = Math.min(1,(now-start)/dur);
+    const eased = 1-Math.pow(1-p,3);
+    el.textContent = won(from + (to-from)*eased);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function render(tierChanged){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.id===state.tier));
+  const d = DATA[state.tier];
+  document.getElementById('tierSubtitle').textContent = d.subtitle;
+
+  renderOptions();
+  renderAddon();
+  renderRules();
+
+  // slip head
+  document.getElementById('slipTierName').textContent = d.name+' · '+d.subtitle;
+
+  // spec block (template only)
+  const specBlock = document.getElementById('specBlock');
+  const specLines = document.getElementById('specLines');
+  specLines.innerHTML='';
+  if(d.options){
+    specBlock.style.display='block';
+    Object.entries(d.options).forEach(([label,list])=>{
+      const idx = (state.optIndex[state.tier]||{})[label]||0;
+      const row = document.createElement('div');
+      row.className='line-item spec';
+      row.innerHTML = `<span class="li-label">${label}</span><span class="li-value">${list[idx]}</span>`;
+      specLines.appendChild(row);
+    });
+  } else {
+    specBlock.style.display='none';
+  }
+
+  // line items
+  const li = document.getElementById('lineItems');
+  li.innerHTML='';
+  let total = 0;
+  d.breakdown.forEach(item=>{
+    total += item.value;
+    const row=document.createElement('div');
+    row.className='line-item';
+    row.innerHTML=`<span class="li-label">${item.label}</span><span class="li-value">${won(item.value)}원</span>`;
+    li.appendChild(row);
+  });
+
+  let rangeText = '';
+  if(d.addon){
+    const a = d.addon;
+    const active = a.required || state.addonOn[state.tier];
+    if(active){
+      const perCut = state.addonPerCut[state.tier];
+      const cost = perCut * a.cuts;
+      total += cost;
+      const row=document.createElement('div');
+      row.className='line-item addon';
+      row.innerHTML=`<span class="li-label">${a.name}</span><span class="li-value">${won(cost)}원</span>`;
+      li.appendChild(row);
+    }
+    const lo = a.cuts*a.min, hi = a.cuts*a.max;
+    rangeText = (a.required?'협업 단가 범위 ':'선택 시 추가 ')+won(lo)+'~'+won(hi)+'원';
+  }
+
+  animateTotal(document.getElementById('totalValue'), total);
+  document.getElementById('totalRange').textContent = rangeText;
+}
+
+document.getElementById('slipDate').textContent =
+  new Date().toISOString().slice(0,10).replace(/-/g,'.');
+
+document.getElementById('copyBtn').addEventListener('click', ()=>{
+  const d = DATA[state.tier];
+  let lines = [`[견적서] ${d.name} · ${d.subtitle}`,''];
+  d.breakdown.forEach(item=> lines.push(`${item.label} : ${won(item.value)}원`));
+  if(d.addon){
+    const a=d.addon;
+    const active = a.required || state.addonOn[state.tier];
+    if(active){
+      const perCut = state.addonPerCut[state.tier];
+      lines.push(`${a.name} : ${won(perCut*a.cuts)}원 (컷당 ${won(perCut)}원 x ${a.cuts}컷)`);
+    }
+  }
+  lines.push('');
+  lines.push(`합계(부가세·인쇄비 별도) : ${document.getElementById('totalValue').textContent}원`);
+  const text = lines.join('\n');
+  const status = document.getElementById('copyStatus');
+  navigator.clipboard.writeText(text).then(()=>{
+    status.textContent='복사 완료';
+    setTimeout(()=>status.textContent='',1800);
+  }).catch(()=>{
+    status.textContent='복사 실패 — 직접 선택해 주세요';
+  });
+});
+
+render(true);
+</script>
+</body>
+</html>
