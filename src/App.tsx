@@ -8,12 +8,33 @@ import calendarFeb    from '@/imports/7.jpg'
 import calendar8      from '@/imports/8.jpg'
 import calendar9      from '@/imports/9.jpg'
 import calendar10     from '@/imports/10.jpg'
-import portfolio12    from '@/imports/12.jpg'
-import portfolioA     from '@/imports/20241209222752_ibououed.jpg'
-import portfolioB     from '@/imports/20241209222752_vxknsquw.jpg'
-import portfolioC     from '@/imports/20241209222753_mwqpqwnm.jpg'
-import portfolioD     from '@/imports/20241209222753_qfpmdqbp.jpg'
-import portfolioE     from '@/imports/ff71cbd676cbde2bd14dae7b02563671.jpg'
+// 실제 터치어그래픽 제작 사례 썸네일 15종 (모두 4:5, 이미지에 카테고리·프로젝트명 타이포 내장)
+import pf01 from '@/imports/portfolio-v2/기관_한국환경산업기술원.png'
+import pf02 from '@/imports/portfolio-v2/기업_아이디어두잇.png'
+import pf03 from '@/imports/portfolio-v2/일러스트_이매진 서울.png'
+import pf04 from '@/imports/portfolio-v2/기관_한국가스기술공사.png'
+import pf05 from '@/imports/portfolio-v2/기업_동아제약.png'
+import pf06 from '@/imports/portfolio-v2/일러스트_한국수목정원관리원.png'
+import pf07 from '@/imports/portfolio-v2/기관_대구오페라하우스.png'
+import pf08 from '@/imports/portfolio-v2/기업_세종 스포츠.png'
+import pf09 from '@/imports/portfolio-v2/일러스트_2026 일상 캘린더.png'
+import pf10 from '@/imports/portfolio-v2/기관_상공회의소.png'
+import pf11 from '@/imports/portfolio-v2/기업_이글루코퍼레이션.png'
+import pf12 from '@/imports/portfolio-v2/일러스트_2026 미니 캘린더.png'
+import pf13 from '@/imports/portfolio-v2/기관_경기도중독관리.png'
+import pf14 from '@/imports/portfolio-v2/기업_설빙.png'
+import pf15 from '@/imports/portfolio-v2/기관_함평군.png'
+
+// 실제 가로형(≈4:3) 제작 사례 원본 사진 — 브랜드별 후보를 비교해 rail 대표컷 1장씩 선택.
+// (같은 브랜드의 다른 촬영컷은 src/imports/portfolio-originals/ 에 그대로 보존)
+import hpSanggong   from '@/imports/portfolio-v2/대한 상공회의소.jpg'            // = 상공회의소 1 (표지, crop 안정적)
+import hpIdeadoit   from '@/imports/portfolio-originals/아이디어두잇 5.jpg'      // 12월 그리드에 스티커 붙이는 손 컷
+import hpImagine    from '@/imports/portfolio-v2/이매진서울.jpg'
+import hpDongaDesk  from '@/imports/portfolio-originals/동아그룹 5.jpg'          // 손에 든 회전목마 일러스트 내지 (베이스 각인 "동아쏘시오그룹")
+import hpDongaDiary from '@/imports/portfolio-v2/동아쏘시오 그룹.jpg'            // 다이어리 (DONG-A SOCIO GROUP) — 동일 업체 secondary
+import hpSejong     from '@/imports/portfolio-v2/세종스포츠.jpg'
+import hpSumok      from '@/imports/portfolio-originals/한국수목정원관리원 6.jpg' // 사계절전시온실 단일 일러스트 (백조·꽃·정원) — rail 밀도 우선
+import hpHampyeong  from '@/imports/portfolio-originals/함평군 2.jpg'            // 1·2월 그리드 펼침 + 국화분재 사진
 
 // ── 공통 레이아웃 셸 ─────────────────────────────────────────────────────────
 // index.css의 .u-shell / .u-rail-pad 로 정의 (fluid 좌우 padding + max-width 1920px).
@@ -120,10 +141,12 @@ type TierDef = {
 }
 type TierId = 'template' | 'custom_basic' | 'custom_highend'
 
+// 옵션 값·개수는 기존 template 기준 그대로. 모든 tier가 동일한 사이즈 / 내지 레이아웃
+// step 을 갖도록 세 등급에 같은 배열을 공유한다. (옵션은 total 계산에 반영되지 않는 표시 전용)
 const TIER_DATA: Record<TierId, TierDef> = {
   template: {
-    name: 'Template Plan',
-    subtitle: '실속형 브랜드 캘린더 (소상공인·스타트업)',
+    name: '베이직 (실속형)',
+    subtitle: '기본 디자인을 활용해 예산은 줄이고 필요한 내용만 맞춰 제작합니다.',
     breakdown: [
       { label: '템플릿 이용료', value: 100000 },
       { label: '표지 디자인',   value: 300000 },
@@ -131,8 +154,8 @@ const TIER_DATA: Record<TierId, TierDef> = {
     ],
     options: {
       '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
-      '표지 스타일':  ['불꽃양 그래픽', '2027 타이포그래피'],
       '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
+      '표지 스타일':  ['불꽃양 그래픽', '2027 타이포그래피'],
     },
     rules: [
       '표지 수정 2회 한정',
@@ -141,36 +164,34 @@ const TIER_DATA: Record<TierId, TierDef> = {
     ],
   },
   custom_basic: {
-    name: 'Custom Basic',
-    subtitle: '맞춤 기획 및 전용 비주얼 (중견기업·일반 브랜드)',
+    name: '커스텀 (맞춤형)',
+    subtitle: '브랜드의 목적과 분위기에 맞춰 표지와 내지를 맞춤 디자인합니다.',
     breakdown: [
       { label: '기획 PT',           value: 1000000 },
       { label: '표지 디자인',        value: 1000000 },
       { label: '내지 디자인 (24p)',  value: 2400000 },
       { label: 'AI 비주얼 애드온',   value:  400000 },
     ],
-    addon: {
-      name: '외부 작가 일러스트 협업',
-      note: '컷당 50만~100만원 · 12컷 기준',
-      cuts: 12, min: 500000, max: 1000000, defaultCut: 750000, required: false,
+    options: {
+      '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
+      '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
     },
     rules: ['기획안 3종 제안', '인쇄 실비 별도'],
   },
   custom_highend: {
-    name: 'Custom High-End',
-    subtitle: '풀 커스텀 하이엔드 솔루션 (대기업·공공기관)',
+    name: '하이앤드 (기획형)',
+    subtitle: '기획부터 비주얼 콘셉트와 내지 구성까지 새롭게 설계합니다.',
     breakdown: [
       { label: '기획 PT',          value: 3000000 },
       { label: '키비주얼 표지',     value: 2000000 },
       { label: '내지 디자인 (24p)', value: 4800000 },
     ],
-    addon: {
-      name: '작가 협업 (필수 항목)',
-      note: '컷당 50만~100만원 · 13컷 기준',
-      cuts: 13, min: 500000, max: 1000000, defaultCut: 500000, required: true,
+    options: {
+      '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
+      '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
     },
     rules: [
-      '인터뷰/만남 기반 전용 기획, 작가 섭외·디렉팅 총괄',
+      '인터뷰/만남 기반 전용 기획, 디렉팅 총괄',
       '지류/특수 후가공 맞춤 견적',
     ],
   },
@@ -424,26 +445,57 @@ function TrustStrip() {
   )
 }
 
-// ── Event & Exhibitions (구 포트폴리오) ──────────────────────────────────────
-// layout-master.png: 큰 섹션 타이틀 아래로 화면 좌우를 꽉 채우는 대형 세로형
-// 이미지가 가로로 흐르는 배열. 작은 카드가 아니라 이미지가 페이지의 주요 시각 요소.
-// 캡션(행사명·일정)은 layout-master 문구를 임시 사용, 이후 실제 사례 이미지로 교체.
-// isText 항목은 layout-master 중앙의 텍스트-only 편집 블록을 재현.
-const EXHIBITIONS: { src?: string; title: string; meta: string; isText?: boolean }[] = [
-  { src: calendarCover,  title: '프리즈 서울',          meta: '9.2 – 9.6 · 코엑스 홀 C·D' },
-  { src: calendarSpread, title: '경기도자비엔날레',      meta: '9.18 – 11.1 · 이천·광주·여주' },
-  { isText: true,        title: '너는 네 삶을 바꿔야 한다', meta: '9.5 – 11.15, 2026 · You Must Change Your Life' },
-  { src: calendarHeld,   title: '제16회 광주비엔날레',   meta: '9.5 – 11.15 · 광주비엔날레 전시관' },
-  { src: calendarFeb,    title: '부산비엔날레 2026',     meta: '8.29 – 11.1 · 부산현대미술관 등' },
-  { src: calendar9,      title: '제주비엔날레',          meta: '8.25 – 11.15 · 제주도립미술관 등' },
-  { src: calendar8,      title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: calendar10,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolio12,    title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolioA,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolioB,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolioC,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolioD,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
-  { src: portfolioE,     title: '행사·전시 아카이브',    meta: '이미지 교체 예정' },
+// ── 제작 사례 (Portfolio) ────────────────────────────────────────────────────
+// [레거시] 이미지에 카테고리 컬러바·업체명이 인쇄된 4:5 썸네일 세트. 현재 렌더에서 제외.
+// 데이터 구조 보존용으로만 남겨둔다(§22). 실제 rail 은 아래 PORTFOLIO 를 사용한다.
+const EXHIBITIONS: { src: string; name: string; category: '기관' | '기업' | '일러스트' }[] = [
+  { src: pf01, name: '한국환경산업기술원',         category: '기관' },
+  { src: pf02, name: '아이디어두잇',               category: '기업' },
+  { src: pf03, name: 'IMAGINE SEOUL',             category: '일러스트' },
+  { src: pf04, name: '한국가스기술공사',           category: '기관' },
+  { src: pf05, name: '동아제약',                   category: '기업' },
+  { src: pf06, name: '한국수목정원관리원',         category: '일러스트' },
+  { src: pf07, name: '대구오페라하우스',           category: '기관' },
+  { src: pf08, name: '세종 스포츠',                category: '기업' },
+  { src: pf09, name: '2026 일상 캘린더',           category: '일러스트' },
+  { src: pf10, name: '상공회의소',                 category: '기관' },
+  { src: pf11, name: '이글루코퍼레이션',           category: '기업' },
+  { src: pf12, name: '2026 미니 캘린더',           category: '일러스트' },
+  { src: pf13, name: '경기도중독관리통합지원센터',  category: '기관' },
+  { src: pf14, name: '설빙',                       category: '기업' },
+  { src: pf15, name: '함평군농업기술센터',         category: '기관' },
+]
+
+// ── 실제 렌더에 쓰는 Portfolio 데이터 ──
+// 가로형 원본 사진 1장 + 그 아래 텍스트(카테고리 / 업체명 / 한 줄 설명)로 구성되는 editorial item.
+// objectPosition: 사진마다 달력 제품이 잘리지 않는 crop 위치. secondaryImages: 동일 프로젝트의
+// 여분 사진(데이터 보존용, 이번 단계 rail 에는 노출하지 않음).
+// 순서: 같은 카테고리·같은 업체가 연달아 나오지 않도록 배치(무한 루프 이음새 포함).
+type PortfolioItem = {
+  src: string
+  category: '공공기관' | '기업' | '일러스트'
+  title: string
+  description: string
+  objectPosition?: string
+  mediaScale?: number      // 이미지만 확대(검은 여백 축소). hover scale 과 별개 element 라 충돌 없음. 기본 1
+  secondaryImages?: string[]
+}
+const PORTFOLIO: PortfolioItem[] = [
+  { src: hpSanggong, category: '공공기관', title: '대한상공회의소',
+    description: '상징 비주얼을 활용한 데스크 캘린더', objectPosition: 'center 48%', mediaScale: 1.14 },
+  { src: hpIdeadoit, category: '기업', title: '아이디어두잇',
+    description: '브랜드 메시지를 담은 오브제형 캘린더', objectPosition: 'center center' },
+  { src: hpSumok, category: '일러스트', title: '한국수목정원관리원',
+    description: '자연의 이미지를 담은 일러스트 캘린더', objectPosition: 'center 52%', mediaScale: 1.16 },
+  { src: hpDongaDesk, category: '기업', title: '동아쏘시오그룹',
+    description: '따뜻한 일러스트로 완성한 데스크 캘린더', objectPosition: 'center center',
+    secondaryImages: [hpDongaDiary] },
+  { src: hpHampyeong, category: '공공기관', title: '함평군농업기술센터',
+    description: '전시 작품을 활용한 벽걸이 캘린더', objectPosition: '52% 44%', mediaScale: 1.4 },
+  { src: hpImagine, category: '일러스트', title: 'IMAGINE SEOUL',
+    description: '아트워크 중심의 일러스트 캘린더', objectPosition: 'center center' },
+  { src: hpSejong, category: '기업', title: '세종스포츠정형외과',
+    description: '스포츠 테마를 활용한 맞춤형 캘린더', objectPosition: 'center center' },
 ]
 
 const RAIL_PAD = 'u-rail-pad'
@@ -453,119 +505,149 @@ function Portfolio() {
   const trackRef = useRef<HTMLDivElement>(null)
   // 가격 계산과 무관한 UI 전용 ref — 마우스 드래그 상태 (라이브러리 없이 native scrollLeft)
   const drag = useRef({ active: false, startX: 0, startScroll: 0 })
-  // 자동 가로 이동 + hover 상태 — 전부 rAF + ref 로만 관리 (프레임마다 React rerender 없음).
+  // 자동 이동 상태 — 전부 rAF + setTimeout + ref 로만 관리 (프레임마다 React rerender 없음).
   const auto = useRef({
-    raf: 0, last: 0, pos: 0,
-    speed: 0, from: 0, to: 0, tStart: 0, dur: 0,   // delta-time 속도 보간
+    raf: 0, holdTimer: 0, resumeTimer: 0,
+    step: 0, loopAt: 0,   // 카드 1장(width+gap) / 원본 세트 1바퀴 거리
     dragging: false, touching: false, cardHover: false, kbFocus: false,
-    resumeTimer: 0,
     onDragStart: () => {}, onDragEnd: () => {},
+    slideBy: (_dir: 1 | -1) => {},   // prev/next 화살표 → 정확히 카드 1장 이동 (effect 에서 채움)
   })
 
-  // reference 처럼 "가만히 있어도 흐르는" 전시 레일.
-  //  · 속도는 delta-time 기반(초당 px 고정), currentSpeed 는 목표값으로 부드럽게 보간
-  //  · 실제 카드 이미지 hover / drag / touch / 수동 wheel 에서 감속 정지 → 잠시 후 가속 재개
-  //  · duplicated track 으로 seamless infinite loop (원본 데이터는 불변, render layer 만 반복)
+  // k-artfestival Event&Exhibitions 처럼 "머물렀다가 한 칸씩 넘어가는" editorial 레일.
+  //  · continuous marquee 아님 — HOLD(≈1200ms) → SLIDE 정확히 카드 1장(width+gap, ≈700ms, easeOut) → HOLD 반복
+  //  · scrollLeft 를 rAF 로 직접 tween → 별도 CSS transition 없음 → 복제 세트 경계에서 loopAt 만큼 즉시 빼서
+  //    무한 루프(리셋이 눈에 안 보임)
+  //  · drag / touch / trackpad wheel / 카드 hover / 키보드 focus 중에는 정지, 조작 종료 후 딜레이를 두고 재개
+  //  · drag·조작 종료 시 가장 가까운 카드로 부드럽게 snap 한 뒤 hold 진입
+  //  · prefers-reduced-motion 에서는 자동 이동 없음 (수동 조작만)
   useEffect(() => {
     const el = viewportRef.current
     const track = trackRef.current
     if (!el || !track) return
 
     const a = auto.current
-    a.pos = el.scrollLeft
-    a.speed = a.from = a.to = 0
-    a.dur = 0
-
-    // 스냅 완전 제거 — auto motion·수동 조작 모두 "자유롭게 멈춤" 이 우선
+    // 스냅 완전 제거 — 자동/수동 모두 스크립트가 위치를 관리한다
     el.style.scrollSnapType = 'none'
 
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) return // auto motion 없음. drag / swipe / trackpad 는 그대로 동작.
-
-    const hoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').matches
-    const TARGET_SPEED = 60 // px per second (desktop)
-
-    let loopAt = 0
     const measure = () => {
       const kids = track.children
-      const n = EXHIBITIONS.length
-      loopAt = kids.length > n
+      const n = PORTFOLIO.length
+      if (kids.length < 2) { a.step = 0; a.loopAt = 0; return }
+      a.step = (kids[1] as HTMLElement).offsetLeft - (kids[0] as HTMLElement).offsetLeft
+      a.loopAt = kids.length > n
         ? (kids[n] as HTMLElement).offsetLeft - (kids[0] as HTMLElement).offsetLeft
         : 0
     }
     measure()
-    window.addEventListener('resize', measure)
 
-    const easeInOut = (p: number) => p * p * (3 - 2 * p) // smoothstep — 양끝 부드럽게, bounce 없음
-    const glide = (to: number, durMs: number) => {
-      a.from = a.speed
-      a.to = to
-      a.tStart = performance.now()
-      a.dur = Math.max(1, durMs)
+    // transition 없이 정수 scrollLeft 만 이동하므로 loop 경계 보정이 눈에 보이지 않는다.
+    const normalize = () => {
+      if (a.loopAt <= 0) return
+      if (el.scrollLeft >= a.loopAt) el.scrollLeft -= a.loopAt
+      else if (el.scrollLeft < 0) el.scrollLeft += a.loopAt
     }
-    const stopNow = () => { a.speed = a.from = a.to = 0; a.dur = 0 }
+    // 트랙패드/네이티브 스크롤이 멈췄을 때만 경계 보정 (tween·drag 중에는 건드리지 않음)
+    const onScroll = () => { if (!a.raf && !a.dragging) normalize() }
 
-    const clearResume = () => { if (a.resumeTimer) { clearTimeout(a.resumeTimer); a.resumeTimer = 0 } }
+    window.addEventListener('resize', measure)
+    el.addEventListener('scroll', onScroll, { passive: true })
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      // 자동 이동 없음. 화살표는 즉시 한 칸 이동(애니메이션 없음).
+      a.slideBy = (dir: 1 | -1) => {
+        measure()
+        if (a.step <= 0) return
+        const idx = Math.round(el.scrollLeft / a.step)
+        el.scrollLeft = (idx + dir) * a.step
+        normalize()
+      }
+      return () => {
+        a.slideBy = () => {}
+        window.removeEventListener('resize', measure)
+        el.removeEventListener('scroll', onScroll)
+      }
+    }
+
+    const hoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    const HOLD_MS = 1200
+    const SLIDE_MS = 700
+    // easeOutCubic — 시작은 빠르고 끝에서 부드럽게 감속, bounce 없음 (≈ cubic-bezier(0.22, 1, 0.36, 1))
+    const ease = (p: number) => 1 - Math.pow(1 - p, 3)
+
     const blocked = () => a.dragging || a.touching || a.cardHover || a.kbFocus
-    const scheduleResume = (delayMs: number, rampMs: number) => {
+    const clearTimers = () => {
+      if (a.holdTimer) { clearTimeout(a.holdTimer); a.holdTimer = 0 }
+      if (a.raf) { cancelAnimationFrame(a.raf); a.raf = 0 }
+    }
+    const clearResume = () => { if (a.resumeTimer) { clearTimeout(a.resumeTimer); a.resumeTimer = 0 } }
+
+    const tween = (to: number, durMs: number, done: () => void) => {
+      const from = el.scrollLeft
+      if (Math.abs(to - from) < 1) { el.scrollLeft = to; normalize(); done(); return }
+      const start = performance.now()
+      const frame = (now: number) => {
+        if (blocked()) { a.raf = 0; return }
+        const p = Math.min(1, (now - start) / durMs)
+        el.scrollLeft = from + (to - from) * ease(p)
+        if (p < 1) { a.raf = requestAnimationFrame(frame) }
+        else { a.raf = 0; normalize(); done() }
+      }
+      a.raf = requestAnimationFrame(frame)
+    }
+
+    const scheduleHold = () => {
+      clearTimers()
+      if (blocked()) return
+      a.holdTimer = window.setTimeout(() => { a.holdTimer = 0; slideOne() }, HOLD_MS)
+    }
+    const slideOne = () => {
+      measure()
+      if (blocked() || a.step <= 0) { scheduleHold(); return }
+      normalize()
+      // 누적 오차 방지: 현재 위치를 카드 격자에 맞춘 다음 정확히 한 칸(step)만 이동
+      const idx = Math.round(el.scrollLeft / a.step)
+      tween((idx + 1) * a.step, SLIDE_MS, scheduleHold)
+    }
+    const snapToNearest = (done: () => void) => {
+      measure()
+      if (a.step <= 0) { done(); return }
+      normalize()
+      tween(Math.round(el.scrollLeft / a.step) * a.step, 340, done)
+    }
+    const scheduleResume = (delayMs: number) => {
+      clearTimers()
       clearResume()
       a.resumeTimer = window.setTimeout(() => {
         a.resumeTimer = 0
         if (blocked()) return
-        glide(TARGET_SPEED, rampMs)
+        snapToNearest(scheduleHold)
       }, delayMs)
     }
 
-    const tick = (now: number) => {
-      if (!a.last) a.last = now
-      let dt = (now - a.last) / 1000
-      a.last = now
-      if (dt > 0.05) dt = 0.05 // frame drop 이후 갑자기 튐 방지
-
-      if (a.dur > 0) {
-        const p = Math.min(1, (now - a.tStart) / a.dur)
-        a.speed = a.from + (a.to - a.from) * easeInOut(p)
-        if (p >= 1) { a.speed = a.to; a.dur = 0 }
-      }
-
-      if (a.dragging) {
-        // 유저가 scrollLeft 를 직접 조작 중. loop 경계만 보정하고 startScroll 도 같이 이동 → 무한 드래그.
-        if (loopAt > 0) {
-          if (el.scrollLeft >= loopAt) { el.scrollLeft -= loopAt; drag.current.startScroll -= loopAt }
-          else if (el.scrollLeft < 0) { el.scrollLeft += loopAt; drag.current.startScroll += loopAt }
-        }
-        a.pos = el.scrollLeft
-      } else if (a.speed > 0.02) {
-        a.pos += a.speed * dt
-        if (loopAt > 0) {
-          while (a.pos >= loopAt) a.pos -= loopAt
-          while (a.pos < 0) a.pos += loopAt
-        }
-        el.scrollLeft = a.pos
-      } else {
-        // 정지 상태: 수동 wheel / trackpad 를 방해하지 않는다. pos 는 따라만 가고 loop 경계만 보정.
-        a.pos = el.scrollLeft
-        if (loopAt > 0) {
-          if (a.pos >= loopAt) { a.pos -= loopAt; el.scrollLeft = a.pos }
-          else if (a.pos < 0) { a.pos += loopAt; el.scrollLeft = a.pos }
-        }
-      }
-      a.raf = requestAnimationFrame(tick)
+    // prev/next 화살표 — 자동 슬라이드와 완전히 같은 rAF easeOut tween 을 정확히 한 칸에 대해 실행.
+    a.slideBy = (dir: 1 | -1) => {
+      measure()
+      if (a.step <= 0) return
+      clearTimers()
+      clearResume()
+      normalize()
+      const idx = Math.round(el.scrollLeft / a.step)
+      tween((idx + dir) * a.step, SLIDE_MS, () => scheduleResume(1400))
     }
-    a.raf = requestAnimationFrame(tick)
 
-    // ── 실제 카드 이미지 hover (빈 레일 공간은 제외) ──
+    // ── 카드 이미지 hover ── (hover 중 정지, leave 후 ~1000ms 뒤 재개)
     const onOver = (e: PointerEvent) => {
       if (!(e.target as Element)?.closest?.('[data-card-img]')) return
       a.cardHover = true
-      clearResume()
-      if (a.to !== 0) glide(0, 320) // 60 → 0, ~320ms 감속 (스르륵 정지)
+      clearTimers(); clearResume()
     }
     const onOut = (e: PointerEvent) => {
       if (!(e.target as Element)?.closest?.('[data-card-img]')) return
       if ((e.relatedTarget as Element | null)?.closest?.('[data-card-img]')) return // 옆 카드로 이동 — 계속 pause
       a.cardHover = false
-      scheduleResume(650, 520) // leave 후 ~650ms 대기 → ~520ms 가속 재개
+      scheduleResume(1100)
     }
     if (hoverCapable) {
       track.addEventListener('pointerover', onOver)
@@ -575,37 +657,39 @@ function Portfolio() {
     // ── 수동 wheel / 트랙패드 : manual 우선 ──
     const onWheel = () => {
       if (a.dragging || a.touching) return
-      if (a.to !== 0) glide(0, 200)
-      scheduleResume(650, 520)
+      clearTimers()
+      scheduleResume(1000)
     }
     el.addEventListener('wheel', onWheel, { passive: true })
 
-    // ── touch : 손대는 동안 정지, 떼면 재개 ──
-    const onTouchStart = () => { a.touching = true; clearResume(); stopNow() }
-    const onTouchEnd = () => { a.touching = false; scheduleResume(750, 520) }
+    // ── touch : 손대는 동안 정지, 떼면 (desktop 보다 조금 길게) 재개 ──
+    const onTouchStart = () => { a.touching = true; clearTimers(); clearResume() }
+    const onTouchEnd = () => { a.touching = false; scheduleResume(1500) }
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     el.addEventListener('touchend', onTouchEnd, { passive: true })
     el.addEventListener('touchcancel', onTouchEnd, { passive: true })
 
     // ── 키보드 focus 가 레일 안에 있을 때 ──
-    const onFocusIn = () => { a.kbFocus = true; clearResume(); if (a.to !== 0) glide(0, 320) }
-    const onFocusOut = () => { a.kbFocus = false; scheduleResume(650, 520) }
+    const onFocusIn = () => { a.kbFocus = true; clearTimers(); clearResume() }
+    const onFocusOut = () => { a.kbFocus = false; scheduleResume(1000) }
     el.addEventListener('focusin', onFocusIn)
     el.addEventListener('focusout', onFocusOut)
 
-    // ── drag (뷰포트 pointer 드래그) : 최우선. hover 무시하고 즉시 정지 ──
-    a.onDragStart = () => { a.dragging = true; clearResume(); stopNow() }
-    a.onDragEnd = () => { a.dragging = false; scheduleResume(850, 520) } // release 후 ~850ms → ~520ms 회복
+    // ── drag (뷰포트 pointer 드래그) : 최우선. 즉시 정지, 종료 후 ~1400ms 뒤 재개 ──
+    a.onDragStart = () => { a.dragging = true; clearTimers(); clearResume() }
+    a.onDragEnd = () => { a.dragging = false; scheduleResume(1400) }
 
-    // 최초 진입 : 살짝 뒤 부드럽게 출발
-    scheduleResume(400, 700)
+    // 최초 진입 : 잠깐 뒤 첫 hold 시작
+    a.resumeTimer = window.setTimeout(() => { a.resumeTimer = 0; scheduleHold() }, 600)
 
     return () => {
-      cancelAnimationFrame(a.raf)
+      clearTimers()
       clearResume()
       a.onDragStart = () => {}
       a.onDragEnd = () => {}
+      a.slideBy = () => {}
       window.removeEventListener('resize', measure)
+      el.removeEventListener('scroll', onScroll)
       track.removeEventListener('pointerover', onOver)
       track.removeEventListener('pointerout', onOut)
       el.removeEventListener('wheel', onWheel)
@@ -631,6 +715,12 @@ function Portfolio() {
     const el = viewportRef.current
     if (!el || !drag.current.active) return
     el.scrollLeft = drag.current.startScroll - (e.clientX - drag.current.startX)
+    // loop 경계 보정 — startScroll 도 같이 이동시켜 무한 드래그 (auto tick 제거에 따라 여기서 처리)
+    const la = auto.current.loopAt
+    if (la > 0) {
+      if (el.scrollLeft >= la) { el.scrollLeft -= la; drag.current.startScroll -= la }
+      else if (el.scrollLeft < 0) { el.scrollLeft += la; drag.current.startScroll += la }
+    }
   }
   function endDrag(e: React.PointerEvent<HTMLDivElement>) {
     const el = viewportRef.current
@@ -642,21 +732,46 @@ function Portfolio() {
     auto.current.onDragEnd() // 잠시 뒤 auto motion 부드럽게 회복
   }
 
+  // 절제된 prev/next 컨트롤 — auto 슬라이드와 동일한 tween 으로 정확히 카드 1장 이동.
+  // (effect 내부에서 채워지는 auto.slideBy 가 pause/resume·loop 보정까지 처리)
+  function nudge(dir: 1 | -1) {
+    auto.current.slideBy(dir)
+  }
+
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+
   return (
-    <section id="portfolio" className="bg-white pt-[44px] pb-[32px] md:pb-[56px] lg:pt-[72px] lg:pb-[84px]">
+    <section id="portfolio" className="bg-white pt-[52px] pb-[76px] md:pb-[96px] lg:pt-[124px] lg:pb-[160px]">
       {/* 헤더: 일반 content shell — 좌측 시작선이 첫 카드 시작선과 연결됨. 제목 ↔ 전체보기 같은 라인 */}
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
             <h2
               className="text-black"
-              style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(24px, 3.8vw, 60px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
+              style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
             >
               제작 사례
             </h2>
             <span className="t-caption text-black/45">Portfolio</span>
           </div>
-          <span className="t-caption text-black/45 shrink-0">포트폴리오 전체보기 ›</span>
+          <div className="flex items-center gap-4 shrink-0">
+            {/* prev/next — 데스크톱 전용, hairline circle. 모바일은 스와이프에 위임 */}
+            <div className="hidden lg:flex items-center gap-2">
+              <button
+                type="button" onClick={() => nudge(-1)} aria-label="이전 제작 사례"
+                className="w-9 h-9 rounded-full border border-black/20 flex items-center justify-center text-black/55 hover:text-black hover:border-black/45 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M7.5 2.5 4 6l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              <button
+                type="button" onClick={() => nudge(1)} aria-label="다음 제작 사례"
+                className="w-9 h-9 rounded-full border border-black/20 flex items-center justify-center text-black/55 hover:text-black hover:border-black/45 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M4.5 2.5 8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </div>
+            <span className="t-caption text-black/45">포트폴리오 전체보기 ›</span>
+          </div>
         </div>
       </div>
 
@@ -664,11 +779,11 @@ function Portfolio() {
         풀-width 가로 레일. overflow는 이 요소 안에서만 발생 → page 가로 밀림 없음.
         트랙 좌우 padding = u-shell 값이라 첫 카드가 제목 시작선과 연결된다.
         조작: 네이티브 가로 스크롤(트랙패드) · 터치 스와이프 · 마우스 드래그.
-        + delta-time 기반 continuous auto-scroll(rAF, 60px/s). 실제 카드 이미지 hover / drag /
-          touch / 수동 wheel 에서 부드럽게 감속 정지 → 잠시 뒤 부드럽게 가속 재개.
-          prefers-reduced-motion 에서는 auto-scroll·hover scale 모두 비활성.
-        scroll-snap 은 제거(자유 정지 우선). 카드 상단·그림자가 잘리지 않도록 트랙에
-          상·하 padding(mt/pb 에서 그만큼 상쇄) → 섹션 전체 spacing 은 그대로.
+        + step carousel: HOLD(≈1200ms) → 카드 1장 SLIDE(≈700ms, easeOut) → HOLD 반복 (continuous 아님).
+          카드 hover / drag / touch / 수동 wheel / 키보드 focus 중 정지 → 조작 종료 후 딜레이 뒤 재개.
+          복제 세트 기반 무한 루프(경계에서 scrollLeft 즉시 보정 → 리셋 비가시).
+          prefers-reduced-motion 에서는 자동 이동 없음(수동 조작만), hover scale 도 비활성.
+        scroll-snap 은 제거. 카드 상단·그림자가 잘리지 않도록 트랙에 상·하 padding.
       */}
       <div
         ref={viewportRef}
@@ -686,48 +801,58 @@ function Portfolio() {
           scrollbarWidth: 'none',
           cursor: 'grab',
         }}
-        className="mt-0 lg:mt-[8px] [&::-webkit-scrollbar]:hidden">
+        className="mt-1 lg:mt-[20px] [&::-webkit-scrollbar]:hidden">
         <div
           ref={trackRef}
           className={`flex ${RAIL_PAD}`}
-          style={{ gap: 'clamp(16px, 1.5vw, 26px)', paddingTop: '40px', paddingBottom: '28px' }}
+          style={{ gap: 'clamp(20px, 2.4vw, 34px)', paddingTop: '44px', paddingBottom: '32px' }}
         >
-          {/* 원본 데이터는 그대로. seamless loop 를 위해 render layer 에서만 한 번 더 그리고,
+          {/* PORTFOLIO(7개)를 그대로. seamless loop 를 위해 render layer 에서만 한 번 더 그리고,
               복제 세트(clone)는 스크린리더 중복 방지를 위해 aria-hidden 처리. */}
-          {[...EXHIBITIONS, ...EXHIBITIONS].map((item, i) => (
+          {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => (
             <figure
               key={i}
               data-card=""
-              aria-hidden={i >= EXHIBITIONS.length ? true : undefined}
+              aria-hidden={i >= PORTFOLIO.length ? true : undefined}
               className="shrink-0 m-0"
-              style={{ width: 'clamp(300px, 22vw, 360px)' }}
+              style={{ width: 'clamp(330px, 40vw, 600px)' }}
             >
-              {/* 이미지만 살짝 라운드. caption은 박스로 묶지 않음. 시각 초점은 image.
-                  hover 시 image wrapper 만 transform(scale/translateY) + shadow 로 앞으로 떠오름.
-                  layout(width/height/margin) 은 불변 → 옆 카드 밀림 없음. caption 은 scale 안 함.
-                  motion-safe: → prefers-reduced-motion 에서는 hover scale 비활성. */}
+              {/* 큰 가로 이미지가 hero. hover transform 은 .pf-card(wrapper) 에, mediaScale 은 <img> 에
+                  걸어 서로 다른 element 에서 처리 → 충돌 없음(hover 시 두 scale 이 자연히 곱해짐).
+                  아래 텍스트 영역은 wrapper 밖이라 움직이지 않는다. 무거운 카드 박스/보더 없음. */}
               <div
                 data-card-img=""
-                className="pf-card overflow-hidden rounded-[12px] bg-black/[0.04]"
-                style={{ aspectRatio: '3 / 4' }}
+                className="pf-card overflow-hidden rounded-[10px] bg-black/[0.04]"
+                style={{ aspectRatio: '4 / 3' }}
               >
-                {item.isText ? (
-                  <div className="w-full h-full flex flex-col justify-center gap-4 p-6 md:p-8 border border-black/10 rounded-[12px]">
-                    <span className="t-meta text-black/45">{item.meta}</span>
-                    <span className="text-black" style={{ fontFamily: 'Noto Serif KR, serif', fontWeight: 700, fontSize: 'clamp(17px, 1.6vw, 26px)', lineHeight: 1.3, letterSpacing: '-0.01em' }}>
-                      {item.title}
-                    </span>
-                  </div>
-                ) : (
-                  <img src={item.src} alt={item.title} draggable={false} className="w-full h-full object-cover select-none pointer-events-none" />
-                )}
+                <img
+                  src={item.src}
+                  alt={`${item.title} · ${item.category} 캘린더 제작 사례`}
+                  draggable={false}
+                  loading={i < 3 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  className="w-full h-full object-cover select-none pointer-events-none"
+                  style={{
+                    objectPosition: item.objectPosition ?? 'center center',
+                    transform: item.mediaScale && item.mediaScale !== 1 ? `scale(${item.mediaScale})` : undefined,
+                  }}
+                />
               </div>
-              {!item.isText && (
-                <figcaption className="mt-3.5">
-                  <p className="t-body font-semibold text-black">{item.title}</p>
-                  <p className="mt-0.5 t-caption text-black/45">{item.meta}</p>
-                </figcaption>
-              )}
+              <figcaption className="mt-4 lg:mt-5">
+                <p className="text-[13px] font-medium tracking-[0.02em] text-black/45" style={fontKr}>{item.category}</p>
+                <h3
+                  className="mt-1.5 text-black"
+                  style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(19px, 1.6vw, 24px)', lineHeight: 1.25, letterSpacing: '-0.02em' }}
+                >
+                  {item.title}
+                </h3>
+                <p
+                  className="mt-2 text-black/55 break-keep"
+                  style={{ ...fontKr, fontWeight: 400, fontSize: 'clamp(14px, 1.05vw, 16px)', lineHeight: 1.6 }}
+                >
+                  {item.description}
+                </p>
+              </figcaption>
             </figure>
           ))}
         </div>
@@ -956,7 +1081,7 @@ function TierRow({ id, selected, onSelect }: { id: TierId; selected: boolean; on
     >
       <span className="flex-1 min-w-0">
         <span className="block text-[14px] font-bold text-ink" style={CFG_KR}>{t.name}</span>
-        <span className="block text-[12px] text-ink-light/60 mt-0.5 break-keep" style={CFG_KR}>{t.subtitle}</span>
+        <span className="block text-[13.5px] text-ink-light/70 mt-1 leading-[1.55] break-keep" style={CFG_KR}>{t.subtitle}</span>
       </span>
       <span className="shrink-0 flex items-center gap-3">
         <span className="text-[12px] font-semibold tabular-nums" style={{ ...CFG_KR, color: selected ? CFG_INK : 'rgba(26,26,26,0.55)' }}>
@@ -1033,21 +1158,15 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
   // ── 가격 계산 state (동결) ──
   const [tier, setTier] = useState<TierId>('template')
   const [optIdx, setOptIdx] = useState<Record<string, Record<string, number | null>>>({})
-  const [addonOn, setAddonOn] = useState<Record<string, boolean>>({ custom_basic: false, custom_highend: true })
-  const [addonPerCut, setAddonPerCut] = useState<Record<string, number>>({ custom_basic: 750000, custom_highend: 500000 })
-  const [copyStatus, setCopyStatus] = useState('')
 
   // ── configurator UI state (표시 전용, 계산과 분리) ──
   const [openStep, setOpenStep] = useState<string | null>('tier')
   const stepRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const d = TIER_DATA[tier]
-  const addon = d.addon ?? null
-  const addonActive = addon ? (addon.required || (addonOn[tier] ?? false)) : false
-  const addonCost = addonActive && addon ? (addonPerCut[tier] ?? addon.defaultCut) * addon.cuts : 0
 
-  let total = d.breakdown.reduce((a, b) => a + b.value, 0)
-  if (addonActive) total += addonCost
+  // 견적 합계 = 등급 breakdown 합 (옵션·보조 선택은 금액에 반영되지 않는다).
+  const total = d.breakdown.reduce((a, b) => a + b.value, 0)
   const animatedTotal = useAnimatedNumber(total)
 
   // Returns null when user has not yet selected this option
@@ -1056,34 +1175,17 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
     return label in tierOpts ? (tierOpts[label] ?? null) : null
   }
 
-  async function copyText() {
-    const lines = [`[견적서] ${d.name} · ${d.subtitle}`, '']
-    d.breakdown.forEach(item => lines.push(`${item.label} : ${wonFmt(item.value)}원`))
-    if (addon && addonActive) {
-      const perCut = addonPerCut[tier] ?? addon.defaultCut
-      lines.push(`${addon.name} : ${wonFmt(perCut * addon.cuts)}원 (컷당 ${wonFmt(perCut)}원 × ${addon.cuts}컷)`)
-    }
-    lines.push('')
-    lines.push(`합계(부가세·인쇄비 별도) : ${wonFmt(total)}원`)
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'))
-      setCopyStatus('복사 완료')
-      setTimeout(() => setCopyStatus(''), 1800)
-    } catch {
-      setCopyStatus('복사 실패 — 직접 선택해 주세요')
-    }
-  }
-
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '.')
 
-  // ── 단계 목록 (현재 tier의 실제 데이터만; 없는 옵션은 만들지 않는다) ──
-  type StepKind = 'tier' | 'option' | 'addon'
+  // ── 공통 numbered step: 01 제작 등급 → 02 사이즈 → 03 내지 레이아웃 (모든 tier 동일) ──
+  // 표지 스타일은 numbered step 이 아닌 베이직 전용 보조 옵션으로만 노출한다.
+  const SUPPLEMENTARY_GROUPS = ['표지 스타일']
+  type StepKind = 'tier' | 'option'
   type StepDef = { key: string; label: string; kind: StepKind; group?: string }
-  const optionGroups = d.options ? Object.keys(d.options) : []
+  const optionGroups = d.options ? Object.keys(d.options).filter(g => !SUPPLEMENTARY_GROUPS.includes(g)) : []
   const steps: StepDef[] = [
     { key: 'tier', label: '제작 등급', kind: 'tier' },
     ...optionGroups.map(g => ({ key: `option:${g}`, label: g, kind: 'option' as StepKind, group: g })),
-    ...(addon ? [{ key: 'addon', label: addon.name, kind: 'addon' as StepKind }] : []),
   ]
 
   function openAndScroll(key: string | null) {
@@ -1106,9 +1208,10 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
     if (id === tier) { advanceFrom('tier'); return }
     setTier(id)
     const nd = TIER_DATA[id]
-    const firstGroup = nd.options ? Object.keys(nd.options)[0] : null
-    const nextKey = firstGroup ? `option:${firstGroup}` : nd.addon ? 'addon' : null
-    openAndScroll(nextKey)
+    const firstGroup = nd.options
+      ? Object.keys(nd.options).filter(g => !SUPPLEMENTARY_GROUPS.includes(g))[0]
+      : null
+    openAndScroll(firstGroup ? `option:${firstGroup}` : null)
   }
 
   function handleOption(group: string, i: number) {
@@ -1116,21 +1219,17 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
     advanceFrom(`option:${group}`)
   }
 
-  function handleAddonToggle() {
-    const next = !(addonOn[tier] ?? false)
-    setAddonOn(prev => ({ ...prev, [tier]: next }))
-    if (next) advanceFrom('addon')
+  // 베이직 전용 보조 옵션 — 표지 스타일. numbered step 이 아니므로 다음 단계로 자동 이동하지 않는다.
+  const coverStyles = d.options?.['표지 스타일'] ?? null
+  function handleCoverStyle(i: number) {
+    setOptIdx(prev => ({ ...prev, [tier]: { ...(prev[tier] ?? {}), ['표지 스타일']: i } }))
   }
 
   function stepState(s: StepDef): { done: boolean; selectedLabel: string | null; hint: string; count: string } {
     if (s.kind === 'tier') return { done: true, selectedLabel: d.name, hint: '', count: '1/1' }
-    if (s.kind === 'option') {
-      const ix = getOptIdx(s.group!)
-      const sel = ix !== null && d.options ? d.options[s.group!][ix] : null
-      return { done: sel !== null, selectedLabel: sel, hint: '옵션을 선택해주세요', count: sel !== null ? '1/1' : '0/1' }
-    }
-    if (addon!.required) return { done: true, selectedLabel: '포함 · 필수', hint: '', count: '1/1' }
-    return { done: addonActive, selectedLabel: addonActive ? '포함' : null, hint: '선택하지 않아도 됩니다', count: addonActive ? '1/1' : '0/1' }
+    const ix = getOptIdx(s.group!)
+    const sel = ix !== null && d.options ? d.options[s.group!][ix] : null
+    return { done: sel !== null, selectedLabel: sel, hint: '옵션을 선택해주세요', count: sel !== null ? '1/1' : '0/1' }
   }
 
   // ── preview / summary 표시값 (기존 state에서만 파생) ──
@@ -1145,7 +1244,6 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
       if (ix !== null) summaryChips.push(d.options[g][ix])
     }
   }
-  if (addonActive && addon) summaryChips.push(addon.name)
 
   const fontKr = CFG_KR
 
@@ -1169,9 +1267,9 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
             </span>
             <h2
               className="text-black"
-              style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(24px, 3.2vw, 42px)', lineHeight: 1.12, letterSpacing: '-0.025em' }}
+              style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(28px, 3.7vw, 48px)', lineHeight: 1.1, letterSpacing: '-0.025em' }}
             >
-              2027 브랜드 캘린더<br />견적 계산기
+              달력 견적 계산기
             </h2>
           </div>
           <p className="max-w-[360px] text-[13px] text-ink-light/70 leading-[1.7]" style={fontKr}>
@@ -1204,9 +1302,6 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
                 {sizeLabel ?? (d.options ? '사이즈 미선택' : d.subtitle)}
               </p>
             </div>
-            {addonActive && (
-              <span className="shrink-0 text-[11px] font-medium" style={{ ...fontKr, color: CFG_INK }}>작가 협업 포함</span>
-            )}
           </div>
         </div>
 
@@ -1250,65 +1345,46 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
                       ))}
                     </div>
                   )}
-
-                  {s.kind === 'addon' && addon && (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-[12px] text-ink-light/65 leading-[1.6] break-keep" style={fontKr}>{addon.note}</p>
-                      {addon.required ? (
-                        <div className="flex items-center gap-2 text-[13px] text-ink" style={fontKr}>
-                          <span className="text-[11px] font-semibold" style={{ color: CFG_INK }}>✓</span>
-                          이 등급의 필수 구성입니다.
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleAddonToggle}
-                          className="w-full flex items-center justify-between text-left"
-                          style={{
-                            minHeight: '56px',
-                            padding: '12px 14px',
-                            borderRadius: '0px',
-                            border: addonActive ? CFG_SEL_BORDER : CFG_REST_BORDER,
-                            background: addonActive ? CFG_SEL_BG : '#ffffff',
-                            transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-                          }}
-                        >
-                          <span className="text-[13px] font-medium text-ink" style={fontKr}>
-                            {addonActive ? '포함' : '포함하지 않음'}
-                          </span>
-                          <CheckDisc on={addonActive} />
-                        </button>
-                      )}
-                      {addonActive && (
-                        <div>
-                          <div className="flex justify-between items-baseline text-[12px] mb-1.5">
-                            <span className="text-ink-light/60" style={fontKr}>컷당 단가</span>
-                            <span className="font-bold tabular-nums" style={{ ...fontKr, color: CFG_INK }}>
-                              {wonFmt(addonPerCut[tier] ?? addon.defaultCut)}원
-                            </span>
-                          </div>
-                          <input
-                            type="range"
-                            min={addon.min}
-                            max={addon.max}
-                            step={50000}
-                            value={addonPerCut[tier] ?? addon.defaultCut}
-                            onChange={e => setAddonPerCut(prev => ({ ...prev, [tier]: parseInt(e.target.value) }))}
-                            className="w-full h-1"
-                            style={{ accentColor: CFG_INK }}
-                          />
-                          <div className="flex justify-between items-baseline text-[12px] text-ink-light/60 mt-1.5" style={fontKr}>
-                            <span>총 {addon.cuts}컷</span>
-                            <span className="tabular-nums">{wonFmt((addonPerCut[tier] ?? addon.defaultCut) * addon.cuts)}원</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </AccordionRow>
               )
             })}
           </div>
+
+          {/* 베이직 전용 보조 옵션 — 표지 스타일. numbered step(01·02·03)보다 한 단계 낮은 위계.
+              커스텀 / 하이앤드에는 '표지 스타일' 옵션이 없으므로 이 블록 자체가 렌더되지 않는다. */}
+          {coverStyles && (
+            <div className="mt-5 pt-5 border-t border-ink/15">
+              <div className="flex items-baseline gap-2 mb-2.5">
+                <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 표지 스타일</span>
+                <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {coverStyles.map((opt, oi) => {
+                  const on = getOptIdx('표지 스타일') === oi
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => handleCoverStyle(oi)}
+                      className="flex items-center gap-2 text-left"
+                      style={{
+                        padding: '8px 13px',
+                        borderRadius: '0px',
+                        border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                        background: on ? CFG_SEL_BG : '#ffffff',
+                        transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                      }}
+                      onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                      onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                    >
+                      <span className="text-[12.5px] font-medium text-ink break-keep" style={fontKr}>{opt}</span>
+                      <CheckDisc on={on} />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 진행 조건 */}
           <div className="mt-6">
@@ -1329,47 +1405,37 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
       <div className="lg:sticky lg:bottom-0 z-20 mt-10 bg-white border-t border-ink pt-5 pb-1">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="text-[11px] font-medium text-ink-light/50" style={fontKr}>선택 플랜</span>
+            <span className="text-[11px] font-medium text-ink-light/50" style={fontKr}>선택 등급</span>
             <span className="text-[14px] font-bold text-ink" style={fontKr}>{d.name}</span>
             {summaryChips.length > 0 && (
               <span className="text-[12px] text-ink-light/55 break-keep" style={fontKr}>{summaryChips.join(' · ')}</span>
             )}
           </div>
 
-          <div className="shrink-0 flex items-baseline gap-2">
-            <span className="text-[11px] font-medium text-ink-light/50" style={fontKr}>현재 예상 견적</span>
-            <span className="font-bold tabular-nums text-ink" style={{ ...fontKr, fontSize: 'clamp(20px, 3.4vw, 26px)' }}>
-              {wonFmt(animatedTotal)}<small className="text-[13px] font-semibold ml-0.5">원</small>
-            </span>
-          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6 lg:shrink-0">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[11px] font-medium text-ink-light/50" style={fontKr}>현재 예상 견적</span>
+              <span className="font-bold tabular-nums text-ink" style={{ ...fontKr, fontSize: 'clamp(20px, 3.4vw, 26px)' }}>
+                {wonFmt(animatedTotal)}<small className="text-[13px] font-semibold ml-0.5">원</small>
+              </span>
+            </div>
 
-          <div className="shrink-0 flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={copyText}
-              className="px-5 py-3 text-[12.5px] font-semibold text-ink hover:bg-ink hover:text-ivory transition-colors"
-              style={{ borderRadius: '999px', border: '0.8px solid #1A1A1A', ...fontKr }}
-            >
-              견적 텍스트 복사
-            </button>
             <button
               onClick={onConsult}
-              className="px-6 py-3 text-[12.5px] font-bold text-white transition-opacity hover:opacity-90"
-              style={{ borderRadius: '999px', background: '#1A1A1A', ...fontKr }}
+              className="w-full lg:w-auto inline-flex items-center justify-center px-8 lg:px-10 py-4 lg:py-[17px] text-white transition-opacity hover:opacity-90"
+              style={{ borderRadius: '999px', background: '#1A1A1A', fontSize: 'clamp(15px, 1.4vw, 18px)', fontWeight: 700, ...fontKr }}
             >
-              상담 신청하기 →
+              이 견적으로 상담 신청하기 →
             </button>
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p className="text-[10.5px] text-ink-light/50" style={fontKr}>
             부가세·인쇄·배송 실비 별도 · 최종 견적은 상담 후 확정됩니다.
           </p>
           <p className="text-[10.5px] text-ink-light/40 shrink-0 tabular-nums" style={fontKr}>기준일 {todayStr}</p>
         </div>
-        {copyStatus && (
-          <p className="mt-1 text-[11.5px] text-ink-light/60" style={fontKr}>{copyStatus}</p>
-        )}
       </div>
     </div>
   )
@@ -1810,7 +1876,7 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
   }, [isOpen])
 
   return (
-    <div className="border-b border-black/30">
+    <div className="border-b border-white/20">
       <button
         type="button"
         id={`faq-btn-${index}`}
@@ -1820,7 +1886,7 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
         className="faq-q group w-full flex items-start justify-between gap-6 py-6 lg:py-7 text-left cursor-pointer"
       >
         <span
-          className="min-w-0 text-black"
+          className="min-w-0 text-white"
           style={{ ...FAQ_KR, fontWeight: 700, fontSize: 'clamp(17px, 1.3vw, 21px)', lineHeight: 1.5, letterSpacing: '-0.02em' }}
         >
           {item.q}
@@ -1846,7 +1912,7 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
         <div ref={innerRef}>
           <p
             className="max-w-[820px] pb-6 lg:pb-7"
-            style={{ ...FAQ_KR, fontWeight: 400, fontSize: 'clamp(15px, 1vw, 16px)', lineHeight: 1.8, color: '#555555' }}
+            style={{ ...FAQ_KR, fontWeight: 400, fontSize: 'clamp(15px, 1vw, 16px)', lineHeight: 1.8, color: 'rgba(255,255,255,0.7)' }}
           >
             {item.a}
           </p>
@@ -1859,27 +1925,28 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
 function FaqSection() {
   const [open, setOpen] = useState<number | null>(0) // 01 = OPEN, 나머지 CLOSED
 
-  // u-section 대신 FAQ 전용 세로 padding — 위는 밀도 있게(Estimator 와 연결), 아래는 Contact 와 충분한 여백
+  // 사이트의 마지막 섹션 — 제거된 Contact 의 full-width black 몰입/마무리 역할을 이어받는다.
+  // 배경은 Contact 와 동일한 bg-black. 상·하 padding 을 늘려 "마지막 장면" 여백을 확보한다.
   return (
-    <section id="faq" className="bg-white pt-[64px] lg:pt-[80px] pb-[80px] lg:pb-[112px] scroll-mt-24">
+    <section id="faq" className="bg-black text-white pt-[80px] lg:pt-[140px] pb-[100px] lg:pb-[160px] scroll-mt-24">
       {/* wide layout — 위 Estimator 와 동일한 SHELL 폭을 그대로 사용 (질문/divider/아이콘 = wide) */}
       <div className={SHELL}>
-        {/* 상단 label — Service 와 동일한 orange dot + text (#FF2D16) */}
+        {/* 상단 label — orange dot + text (#FF2D16) 유지 */}
         <div className="flex items-center gap-2.5 mb-5">
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#FF2D16' }} aria-hidden />
           <span style={{ ...FAQ_KR, fontWeight: 700, fontSize: '14px', letterSpacing: '-0.01em', color: '#FF2D16' }}>자주 묻는 질문</span>
         </div>
 
-        {/* headline — Service headline 과 유사 hierarchy (Hero 보다 작게) */}
+        {/* headline — 검정 배경 대비 white */}
         <h2
-          className="text-black"
+          className="text-white"
           style={{ ...FAQ_KR, fontWeight: 800, fontSize: 'clamp(30px, 3.6vw, 56px)', lineHeight: 1.15, letterSpacing: '-0.035em' }}
         >
           궁금한 점.
         </h2>
 
         {/* accordion — 첫 줄 위에도 hairline. 답변 <p> 만 readable width 로 제한 */}
-        <div className="mt-9 lg:mt-12 border-t border-black/30">
+        <div className="mt-9 lg:mt-12 border-t border-white/20">
           {FAQ_QA.map((item, i) => (
             <FaqRow
               key={i}
@@ -1890,6 +1957,11 @@ function FaqSection() {
             />
           ))}
         </div>
+
+        {/* 사이트 최하단 — 제거된 Contact 에 있던 copyright 를 절제된 형태로만 유지 (새 정보 추가 없음) */}
+        <p className="mt-20 lg:mt-28 text-[11px] text-white/30 font-mono">
+          © 2026 터치어그래픽 · TOUCHGRAPHIC
+        </p>
       </div>
     </section>
   )
@@ -2400,15 +2472,14 @@ export default function App() {
       <Header />
       <Hero />
       <Portfolio />
-      <Service />
-      <Clients />
       <EstimatorSection onConsult={() => setView('consult')} />
+      <Clients />
       <FaqSection />
-      <Contact />
     </div>
   )
 }
 
-// 레거시(현재 미사용): TrustStrip · Consultation · FAQ · Footer.
-// 기존 정의는 남겨두되 1차 리디자인에서는 렌더하지 않는다.
-void TrustStrip; void Consultation; void FAQ; void Footer;
+// 레거시(현재 미사용): TrustStrip · Consultation · FAQ · Footer · Service · Contact.
+// EXHIBITIONS = 구 4:5 썸네일 데이터(§22 로 보존, 렌더는 PORTFOLIO 사용).
+// 기존 정의는 남겨두되 렌더하지 않는다.
+void TrustStrip; void Consultation; void FAQ; void Footer; void Service; void Contact; void EXHIBITIONS;
