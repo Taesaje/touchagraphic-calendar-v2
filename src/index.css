@@ -107,6 +107,46 @@ body {
   .svc-row:hover .svc-arrow { transform: none; }
 }
 
+/* Clients — 실제 로고 색상을 그대로 두되(원본 파일 무변경) 화면에서만 하나의 짙은 gray 톤으로 통일.
+   brightness(0)은 원본 hue/명도와 무관하게 모든 로고를 동일한 검정 실루엣으로 만들어
+   브랜드별로 다른 gray tone이 생기는 걸 막는다. opacity로만 "근접 검정" 밀도를 낮춘다. */
+/* 일부 로고 원본 PNG에 아주 옅은(반투명) 디자인 캔버스 그리드가 실수로 같이 export 돼 있다.
+   brightness(0)만 쓰면 그 반투명 그리드까지 검게 보여 지저분해지므로, alpha 0.5 미만은 완전히
+   지우는 SVG filter(#cl-mono-alpha-cut, 아래 Clients 컴포넌트에 정의)를 먼저 통과시켜
+   실제 로고 획(거의 불투명)만 남긴 뒤 brightness(0)으로 단색화한다. 원본 파일은 무변경. */
+.cl-logo {
+  filter: url(#cl-mono-alpha-cut) brightness(0);
+  opacity: 0.8;
+  transition: opacity 200ms ease;
+}
+/* 일부 로고 파일은 투명 배경이 아니라 불투명 흰 배경 사각형이 내장돼 있어(원본 파일이라 수정 불가),
+   brightness(0)을 그대로 쓰면 배경까지 검게 칠해져 로고가 안 보인다. 이 경우는 blend-mode로
+   흰 배경만 카드 배경에 녹여 없앤다(로고 자체가 이미 진한 단색이라 grayscale만으로 충분). */
+.cl-logo-blend {
+  filter: grayscale(1) contrast(9);
+  opacity: 0.85;
+  mix-blend-mode: multiply;
+  transition: opacity 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cl-logo:hover, .cl-logo-blend:hover { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cl-logo, .cl-logo-blend { transition: none; }
+}
+
+/* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
+.pf-feed-item {
+  animation: pfFeedFadeIn 220ms ease both;
+}
+@keyframes pfFeedFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-feed-item { animation: none; }
+}
+
 /* FAQ accordion — 답변 패널 height(JS 실측 scrollHeight)를 0↔auto 로 부드럽게 (bounce 없음).
    panel 아래 Contact 가 자연스럽게 밀려 내려가고 올라옴. 초기값은 닫힘. */
 .faq-panel {

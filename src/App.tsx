@@ -36,6 +36,22 @@ import hpSejong     from '@/imports/portfolio-v2/세종스포츠.jpg'
 import hpSumok      from '@/imports/portfolio-originals/한국수목정원관리원 6.jpg' // 사계절전시온실 단일 일러스트 (백조·꽃·정원) — rail 밀도 우선
 import hpHampyeong  from '@/imports/portfolio-originals/함평군 2.jpg'            // 1·2월 그리드 펼침 + 국화분재 사진
 
+// 실제 클라이언트 로고 12종(아이디어두잇은 idea/doit 2개 asset 조합) — Clients 섹션 monochrome block 전용.
+// 원본 파일은 절대 수정하지 않고, 화면에서는 CSS filter(.cl-logo, index.css)로만 monochrome 처리한다.
+import clDongaPharm    from '@/imports/client-logos/donga-pharm.svg'
+import clSejongSports  from '@/imports/client-logos/sejong-sports.svg'
+import clKoagi         from '@/imports/client-logos/koagi.png'
+import clKorcham       from '@/imports/client-logos/korcham.png'
+import clIgloo         from '@/imports/client-logos/igloo.svg'
+import clGcamc         from '@/imports/client-logos/gcamc.png'
+import clHampyeong     from '@/imports/client-logos/hampyeong.png'
+import clKogasTech     from '@/imports/client-logos/kogas-tech.png'
+import clKeiti         from '@/imports/client-logos/keiti.png'
+import clIdeadoitIdea  from '@/imports/client-logos/ideadoit-idea.png'
+import clIdeadoitDoit  from '@/imports/client-logos/ideadoit-doit.png'
+import clSulbing       from '@/imports/client-logos/sulbing.png'
+import clDaeguOpera    from '@/imports/client-logos/daegu-opera.png'
+
 // ── 공통 레이아웃 셸 ─────────────────────────────────────────────────────────
 // index.css의 .u-shell / .u-rail-pad 로 정의 (fluid 좌우 padding + max-width 1920px).
 // 모든 일반 섹션이 이 셸을 공유해 좌측 시작선을 일치시킨다.
@@ -140,6 +156,30 @@ type TierDef = {
   rules: string[]
 }
 type TierId = 'template' | 'custom_basic' | 'custom_highend'
+
+// 베이직 전용 보조 옵션 — 종이 사양. 가격 데이터가 없어 계산에는 연결하지 않고
+// consultation 전달용 선택 정보로만 사용한다 (표지 스타일과 동일한 위계).
+type PaperType = 'undecided' | 'snow' | 'rendezvous'
+const PAPER_TYPE_OPTIONS: { id: PaperType; label: string }[] = [
+  { id: 'snow', label: '스노우지' },
+  { id: 'rendezvous', label: '랑데뷰지' },
+  { id: 'undecided', label: '미정' },
+]
+
+// 베이직 전용 '표지 스타일' 선택("불꽃양 그래픽" / "2027 타이포그래피")과 연동되는
+// 실물 제작 예시 사진 슬롯. 라벨 → key 매핑을 거치는 이유는 옵션 배열 순서가 아니라
+// 실제 표시 문구를 기준으로 안전하게 연결하기 위함이다.
+// 사진이 준비되면 import 해서 아래 배열의 null 자리에 넣기만 하면 preview 가
+// placeholder 대신 실제 이미지로 자동 교체된다. (가격 계산과 무관, 표시 전용)
+type CoverStyleKey = 'graphic' | 'typography'
+const COVER_STYLE_TO_KEY: Record<string, CoverStyleKey> = {
+  '불꽃양 그래픽': 'graphic',
+  '2027 타이포그래피': 'typography',
+}
+const COVER_STYLE_PREVIEWS: Record<CoverStyleKey, (string | null)[]> = {
+  graphic: [null, null],
+  typography: [null, null],
+}
 
 // 옵션 값·개수는 기존 template 기준 그대로. 모든 tier가 동일한 사이즈 / 내지 레이아웃
 // step 을 갖도록 세 등급에 같은 배열을 공유한다. (옵션은 total 계산에 반영되지 않는 표시 전용)
@@ -284,8 +324,8 @@ const RESULT_LABELS: Record<string, string> = {
 
 // ── 헤더 ─────────────────────────────────────────────────────────────────────
 // media-palette.co.kr desktop 헤더 구조 재현:
-//   [좌: 텍스트 로고]  [중앙: 밝은 gray rounded nav + 얇은 세로 구분선]  [우: 액션 버튼 2개]
-//   · 빠른상담 = reference blue(임시, 브랜드색은 추후 교체)  · 회사소개서 = white + black border
+//   [좌: 텍스트 로고]  [중앙: 밝은 gray rounded nav + 얇은 세로 구분선]  [우: 액션 버튼]
+//   · 빠른상담 = reference blue(임시, 브랜드색은 추후 교체)
 //   · lg 미만 → 로고 + '제작 문의' 최소 구조 (모바일 헤더는 새로 디자인하지 않음)
 // 좌우 시작선은 Hero(.u-shell)와 동일하게 맞춘다. 수치는 reference 1440px 화면 기준 근사값.
 const HEADER_NAV = [
@@ -293,26 +333,50 @@ const HEADER_NAV = [
   { label: '견적 계산하기', href: '#estimator', targetId: 'estimator-scroll-target' },
 ]
 
-function Header() {
+// nav 클릭 시 target(섹션 제목 블록)이 viewport 세로 중앙에 오도록 스크롤.
+// fixed 헤더 때문에 scroll-margin-top 만으로는 중앙 정렬이 안 되므로 rect 로 직접 계산한다.
+// App 의 route 전환 후 pending scroll 처리에서도 재사용하기 위해 모듈 스코프로 둔다.
+function scrollToCenter(id: string) {
+  const target = document.getElementById(id)
+  if (!target) return
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const rect = target.getBoundingClientRect()
+  const targetY = window.scrollY + rect.top - (window.innerHeight - rect.height) / 2
+  window.scrollTo({ top: Math.max(0, targetY), behavior: reduce ? 'auto' : 'smooth' })
+}
+
+// page: 현재 어느 화면에서 렌더되는지('landing' | 'portfolio'). navigate: App 이 소유한 route 전환 함수.
+// '제작 사례' / '견적 계산하기' 는 landing 에서는 기존처럼 같은 페이지 내 스크롤, /portfolio 에서는
+// 서로의 페이지로 이동(+ 필요 시 이동 후 스크롤 위치 예약)하도록 분기한다.
+function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'; navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
   function scrollToContact() {
     document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
-  // nav 클릭 시 target(섹션 제목 블록)이 viewport 세로 중앙에 오도록 스크롤.
-  // fixed 헤더 때문에 scroll-margin-top 만으로는 중앙 정렬이 안 되므로 rect 로 직접 계산한다.
-  function scrollToCenter(id: string) {
-    const target = document.getElementById(id)
-    if (!target) return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const rect = target.getBoundingClientRect()
-    const targetY = window.scrollY + rect.top - (window.innerHeight - rect.height) / 2
-    window.scrollTo({ top: Math.max(0, targetY), behavior: reduce ? 'auto' : 'smooth' })
+  function handleLogoClick(e: React.MouseEvent) {
+    e.preventDefault()
+    if (page === 'landing') {
+      window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+      return
+    }
+    navigate('/')
+  }
+  function handleNavClick(e: React.MouseEvent, targetId: string) {
+    e.preventDefault()
+    if (targetId === 'portfolio-scroll-target') {
+      if (page === 'portfolio') { window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); return }
+      navigate('/portfolio')
+      return
+    }
+    // estimator
+    if (page === 'landing') { scrollToCenter(targetId); return }
+    navigate('/', { scrollTo: targetId })
   }
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/[0.07]">
       <div className={`${SHELL} h-[64px] lg:h-[96px] grid grid-cols-[1fr_auto_1fr] items-center gap-6`}>
         {/* 좌: 텍스트 로고 */}
-        <a href="#" className="justify-self-start text-[17px] lg:text-[22px] font-extrabold tracking-[-0.02em] text-black leading-none" style={fontKr}>
+        <a href="/" onClick={handleLogoClick} className="justify-self-start text-[17px] lg:text-[22px] font-extrabold tracking-[-0.02em] text-black leading-none" style={fontKr}>
           터치어그래픽
         </a>
 
@@ -323,7 +387,7 @@ function Header() {
               {i > 0 && <span className="mx-1 h-3 w-px bg-black/[0.16]" aria-hidden />}
               <a
                 href={item.href}
-                onClick={e => { e.preventDefault(); scrollToCenter(item.targetId) }}
+                onClick={e => handleNavClick(e, item.targetId)}
                 className="px-[30px] py-2 text-[17px] font-semibold text-black/90 hover:text-black transition-colors leading-none"
                 style={fontKr}
               >
@@ -335,16 +399,11 @@ function Header() {
 
         {/* 우: 액션 버튼 */}
         <div className="justify-self-end flex items-center gap-2">
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center">
             <a href="#contact"
               className="inline-flex items-center justify-center h-[54px] lg:min-w-[148px] px-[30px] rounded-[10px] text-[16px] font-bold text-white leading-none transition-opacity hover:opacity-90"
               style={{ ...fontKr, background: '#1E50E0' }}>
               빠른상담
-            </a>
-            <a href="#"
-              className="inline-flex items-center justify-center h-[54px] lg:min-w-[148px] px-[30px] rounded-[10px] text-[16px] font-bold text-black leading-none bg-white border border-black/25 hover:bg-black hover:text-white transition-colors"
-              style={fontKr}>
-              회사소개서
             </a>
           </div>
           <button onClick={scrollToContact}
@@ -479,28 +538,31 @@ type PortfolioItem = {
   objectPosition?: string
   mediaScale?: number      // 이미지만 확대(검은 여백 축소). hover scale 과 별개 element 라 충돌 없음. 기본 1
   secondaryImages?: string[]
+  // Portfolio 전체보기 페이지(/portfolio) 전용 필터 분류. 위 표시용 category 와는 별개 개념 —
+  // Landing 카드의 category 는 그대로 두고 이 필드만 추가로 사용한다.
+  filterType?: '기업' | '기관'
 }
 const PORTFOLIO: PortfolioItem[] = [
   { src: hpSanggong, category: '공공기관', title: '대한상공회의소',
-    description: '상징 비주얼을 활용한 데스크 캘린더', objectPosition: 'center 48%', mediaScale: 1.14 },
+    description: '상징 비주얼을 활용한 데스크 캘린더', objectPosition: 'center 50%', mediaScale: 1.55, filterType: '기관' },
   { src: hpIdeadoit, category: '기업', title: '아이디어두잇',
-    description: '브랜드 메시지를 담은 오브제형 캘린더', objectPosition: 'center center' },
+    description: '브랜드 메시지를 담은 오브제형 캘린더', objectPosition: 'center center', filterType: '기업' },
   { src: hpSumok, category: '일러스트', title: '한국수목정원관리원',
-    description: '자연의 이미지를 담은 일러스트 캘린더', objectPosition: 'center 52%', mediaScale: 1.16 },
+    description: '자연의 이미지를 담은 일러스트 캘린더', objectPosition: 'center 51%', mediaScale: 1.5, filterType: '기관' },
   { src: hpDongaDesk, category: '기업', title: '동아쏘시오그룹',
     description: '따뜻한 일러스트로 완성한 데스크 캘린더', objectPosition: 'center center',
-    secondaryImages: [hpDongaDiary] },
+    secondaryImages: [hpDongaDiary], filterType: '기업' },
   { src: hpHampyeong, category: '공공기관', title: '함평군농업기술센터',
-    description: '전시 작품을 활용한 벽걸이 캘린더', objectPosition: '52% 44%', mediaScale: 1.4 },
+    description: '전시 작품을 활용한 벽걸이 캘린더', objectPosition: 'center 48%', mediaScale: 1.38, filterType: '기관' },
   { src: hpImagine, category: '일러스트', title: 'IMAGINE SEOUL',
-    description: '아트워크 중심의 일러스트 캘린더', objectPosition: 'center center' },
+    description: '아트워크 중심의 일러스트 캘린더', objectPosition: 'center center', mediaScale: 1.4, filterType: '기업' },
   { src: hpSejong, category: '기업', title: '세종스포츠정형외과',
-    description: '스포츠 테마를 활용한 맞춤형 캘린더', objectPosition: 'center center' },
+    description: '스포츠 테마를 활용한 맞춤형 캘린더', objectPosition: 'center center', filterType: '기업' },
 ]
 
 const RAIL_PAD = 'u-rail-pad'
 
-function Portfolio() {
+function Portfolio({ navigate }: { navigate: (path: string) => void }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   // 가격 계산과 무관한 UI 전용 ref — 마우스 드래그 상태 (라이브러리 없이 native scrollLeft)
@@ -770,7 +832,13 @@ function Portfolio() {
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden><path d="M4.5 2.5 8 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
             </div>
-            <span className="t-caption text-black/45">포트폴리오 전체보기 ›</span>
+            <button
+              type="button"
+              onClick={() => navigate('/portfolio')}
+              className="t-caption text-black/45 hover:text-black transition-colors"
+            >
+              포트폴리오 전체보기 ›
+            </button>
           </div>
         </div>
       </div>
@@ -1150,6 +1218,86 @@ function CalendarPreview({ ratio }: { ratio: [number, number] }) {
   )
 }
 
+// 베이직 전용 '표지 스타일' 선택과 연동되는 예시 사진 2장 preview.
+// styleKey 가 바뀌면 짧게 fade-out 한 뒤, 새 이미지 2장이 아래에서 살짝 올라오며
+// fade-in 한다(두 번째 이미지가 첫 번째보다 살짝 늦게 등장). prefers-reduced-motion 이면
+// 애니메이션 없이 즉시 전환한다. 사진이 없는 슬롯은 중립 placeholder 로 대체된다.
+function CoverStylePreview({ styleKey }: { styleKey: CoverStyleKey | null }) {
+  const [displayKey, setDisplayKey] = useState<CoverStyleKey | null>(styleKey)
+  const [phase, setPhase] = useState<'in' | 'out'>('in')
+  const timerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (styleKey === displayKey) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      setDisplayKey(styleKey)
+      setPhase('in')
+      return
+    }
+    setPhase('out')
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => {
+      setDisplayKey(styleKey)
+      setPhase('in')
+    }, 110)
+    return () => { if (timerRef.current) window.clearTimeout(timerRef.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [styleKey])
+
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+  const images = displayKey ? COVER_STYLE_PREVIEWS[displayKey] : null
+
+  return (
+    <div className="mt-4">
+      <p className="mb-2.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>표지 스타일 예시</p>
+      {!images ? (
+        <div
+          className="flex items-center justify-center text-center"
+          style={{
+            aspectRatio: '16 / 7',
+            background: '#FAFAF8',
+            border: '1px solid rgba(26,26,26,0.10)',
+          }}
+        >
+          <span className="text-[12px] text-ink-light/40 px-4 break-keep" style={fontKr}>
+            표지 스타일을 선택하면 예시 이미지가 표시됩니다
+          </span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {images.map((src, i) => (
+            <div
+              key={i}
+              className="overflow-hidden"
+              style={{
+                aspectRatio: '4 / 5',
+                background: '#FAFAF8',
+                border: '1px solid rgba(26,26,26,0.10)',
+                opacity: phase === 'in' ? 1 : 0,
+                transform: phase === 'in' ? 'translateY(0)' : 'translateY(8px)',
+                transition: phase === 'in'
+                  ? `opacity 260ms ${CFG_EASE} ${i * 60}ms, transform 260ms ${CFG_EASE} ${i * 60}ms`
+                  : `opacity 110ms ${CFG_EASE}, transform 110ms ${CFG_EASE}`,
+              }}
+            >
+              {src ? (
+                <img src={src} alt="" className="w-full h-full object-cover" draggable={false} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-[11.5px] text-ink-light/40" style={fontKr}>
+                    예시 이미지 {String(i + 1).padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 인라인 견적 계산기 (랜딩 내장용) ────────────────────────────────────────
 // UX: Sincerely configurator (좌 preview / 우 progressive accordion / 하단 요약).
 // Visual: Touchgraphic (white·black 중심, hairline rule, 최소 radius, 제한적 accent).
@@ -1224,6 +1372,19 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
   function handleCoverStyle(i: number) {
     setOptIdx(prev => ({ ...prev, [tier]: { ...(prev[tier] ?? {}), ['표지 스타일']: i } }))
   }
+  // 왼쪽 preview 영역과 연동되는 key. 별도 state 없이 기존 '표지 스타일' 선택값에서만 파생한다.
+  const coverStyleSelectedLabel = (() => {
+    if (!coverStyles) return null
+    const ix = getOptIdx('표지 스타일')
+    return ix !== null ? coverStyles[ix] : null
+  })()
+  const coverStyleKey: CoverStyleKey | null = coverStyleSelectedLabel
+    ? (COVER_STYLE_TO_KEY[coverStyleSelectedLabel] ?? null)
+    : null
+
+  // 베이직 전용 보조 옵션 — 종이 사양. 표지 스타일과 동일하게 numbered step 이 아니며,
+  // 가격에는 반영되지 않는 consultation 전달용 선택값이다.
+  const [paperType, setPaperType] = useState<PaperType>('undecided')
 
   function stepState(s: StepDef): { done: boolean; selectedLabel: string | null; hint: string; count: string } {
     if (s.kind === 'tier') return { done: true, selectedLabel: d.name, hint: '', count: '1/1' }
@@ -1303,6 +1464,8 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
               </p>
             </div>
           </div>
+
+          {coverStyles && <CoverStylePreview styleKey={coverStyleKey} />}
         </div>
 
         {/* 우: progressive accordion */}
@@ -1350,50 +1513,87 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
             })}
           </div>
 
-          {/* 베이직 전용 보조 옵션 — 표지 스타일. numbered step(01·02·03)보다 한 단계 낮은 위계.
-              커스텀 / 하이앤드에는 '표지 스타일' 옵션이 없으므로 이 블록 자체가 렌더되지 않는다. */}
+          {/* 베이직 전용 보조 옵션 — 표지 스타일 / 종이 사양. numbered step(01·02·03)보다 한 단계 낮은 위계.
+              커스텀 / 하이앤드에는 '표지 스타일' 옵션이 없으므로 이 블록 자체가 렌더되지 않는다.
+              데스크톱에서는 두 그룹을 좌우로, 좁은 화면에서는 세로로 쌓는다. */}
           {coverStyles && (
-            <div className="mt-5 pt-5 border-t border-ink/15">
-              <div className="flex items-baseline gap-2 mb-2.5">
-                <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 표지 스타일</span>
-                <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
+            <div className="mt-8 pt-8 border-t border-ink/15 flex flex-col lg:flex-row gap-8 lg:gap-16">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 mb-5">
+                  <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 표지 스타일</span>
+                  <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {coverStyles.map((opt, oi) => {
+                    const on = getOptIdx('표지 스타일') === oi
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => handleCoverStyle(oi)}
+                        className="flex items-center gap-2.5 text-left"
+                        style={{
+                          padding: '15px 20px',
+                          borderRadius: '0px',
+                          border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                          background: on ? CFG_SEL_BG : '#ffffff',
+                          transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                        }}
+                        onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                        onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                      >
+                        <span className="text-[13px] font-medium text-ink break-keep" style={fontKr}>{opt}</span>
+                        <CheckDisc on={on} />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {coverStyles.map((opt, oi) => {
-                  const on = getOptIdx('표지 스타일') === oi
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => handleCoverStyle(oi)}
-                      className="flex items-center gap-2 text-left"
-                      style={{
-                        padding: '8px 13px',
-                        borderRadius: '0px',
-                        border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
-                        background: on ? CFG_SEL_BG : '#ffffff',
-                        transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-                      }}
-                      onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
-                      onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
-                    >
-                      <span className="text-[12.5px] font-medium text-ink break-keep" style={fontKr}>{opt}</span>
-                      <CheckDisc on={on} />
-                    </button>
-                  )
-                })}
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2 mb-5">
+                  <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 종이 사양</span>
+                  <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {PAPER_TYPE_OPTIONS.map(({ id, label }) => {
+                    const on = paperType === id
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setPaperType(id)}
+                        className="flex items-center gap-2.5 text-left"
+                        style={{
+                          padding: '15px 20px',
+                          borderRadius: '0px',
+                          border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                          background: on ? CFG_SEL_BG : '#ffffff',
+                          transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                        }}
+                        onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                        onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                      >
+                        <span className="text-[13px] font-medium text-ink break-keep" style={fontKr}>{label}</span>
+                        <CheckDisc on={on} />
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
 
-          {/* 진행 조건 */}
-          <div className="mt-6">
+          {/* 진행 조건 — numbered row + divider 로 정돈된 정보 영역 (문구 변경 없음) */}
+          <div className="mt-10 pt-8 border-t border-ink/15">
             <span className="text-[11px] font-bold text-ink-light/55 block mb-2" style={fontKr}>진행 조건</span>
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col">
               {d.rules.map((rule, i) => (
-                <li key={i} className="text-[12px] text-ink-light/60 leading-[1.7] pl-4 relative break-keep" style={fontKr}>
-                  <span className="absolute left-0 text-ink/30">—</span>
-                  {rule}
+                <li key={i} className="flex items-start gap-5 py-5 border-t border-ink/10 first:border-t-0">
+                  <span className="text-[11px] text-ink-light/40 tabular-nums shrink-0 pt-0.5" style={fontKr}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-[13.5px] text-ink-light/70 leading-[1.85] break-keep" style={fontKr}>{rule}</span>
                 </li>
               ))}
             </ul>
@@ -1527,35 +1727,85 @@ function Service() {
 }
 
 // ── CLIENTS ──────────────────────────────────────────────────────────────────
-// layout-master.png: 큰 Clients 타이틀 + 짧은 설명 + 로고가 넓게 배열되는 그리드.
-// 실제 로고 asset이 없으므로 기관명 텍스트 placeholder로 구성 (추후 실제 로고 교체).
-const CLIENT_NAMES = [
-  'LG', '화성시', '경기도', 'KAIST', '세종대학교', '단국대학교', '국민대학교',
-  '신한금융그룹', '광주과학기술원', '근로복지공단', '국민연금공단', '한국가스공사', '서울특별시교육청', '식품의약품안전처',
+// 실제 공식 로고 asset + 통일된 monochrome block system. 원본 파일/색상은 그대로 두고,
+// 화면에서만 CSS filter(.cl-logo, index.css: brightness(0) + opacity)로 모든 로고를 같은
+// 짙은 gray 톤으로 통일한다 — brightness(0)은 원본 hue/명도와 무관하게 모든 로고를 동일한
+// "검정 실루엣"으로 만들어, 브랜드별로 톤이 갈리는 문제를 원천적으로 막는다.
+// scale: 로고마다 원본 캔버스 여백이 달라 동일 height로 맞춰도 체감 크기가 다르기 때문에 두는
+// 표시 전용 보정값(기본 1). 실제 내용이 캔버스 대부분을 차지하는 로고는 1, 캔버스에 여백이 큰
+// 로고(대한상공회의소·이글루코퍼레이션)만 확대해 시각 밀도를 맞춘다.
+type ClientLogo = {
+  name: string
+  src?: string
+  scale?: number
+  // 이글루코퍼레이션 전용 — 원본 SVG에 불투명 흰 배경 사각형이 내장돼 있어 brightness(0) 대신
+  // blend-mode 로 흰 배경만 지운다(위 .cl-logo-blend 참고)
+  blend?: boolean
+  // 아이디어두잇 전용 — 공식 사이트가 idea/doit 두 asset으로 나눠 쓰는 로고를 한 셀에서 조합
+  ideaSrc?: string
+  doitSrc?: string
+}
+const CLIENTS: ClientLogo[] = [
+  // 1행 = 기관, 2행 = 기업, 3행 = 나머지(순서 요청대로)
+  { name: '함평군 농업기술센터',       src: clHampyeong,    scale: 1 },
+  { name: '한국수목원정원관리원',       src: clKoagi,        scale: 1.15 },
+  { name: '대한상공회의소',           src: clKorcham,      scale: 1.7 },
+  { name: '경기도중독관리통합지원센터', src: clGcamc,        scale: 1 },
+  { name: '아이디어두잇',             ideaSrc: clIdeadoitIdea, doitSrc: clIdeadoitDoit },
+  { name: '설빙',                   src: clSulbing,      scale: 1 },
+  { name: '동아제약',                src: clDongaPharm,   scale: 1 },
+  { name: '이글루코퍼레이션',          src: clIgloo,        scale: 1.8, blend: true },
+  { name: '한국가스기술공사',          src: clKogasTech,    scale: 1 },
+  { name: '한국환경산업기술원',        src: clKeiti,        scale: 1 },
+  { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
+  { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
 
 function Clients() {
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
     <section className="bg-white u-section">
+      {/* .cl-logo(index.css)가 참조하는 alpha threshold filter — 화면에 그려지지 않는 정의 전용 SVG */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <filter id="cl-mono-alpha-cut">
+          <feComponentTransfer>
+            <feFuncA type="discrete" tableValues="0 0 0 0 0 1 1 1 1 1" />
+          </feComponentTransfer>
+        </filter>
+      </svg>
       <div className={SHELL}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <h2 className="t-display text-black">Clients</h2>
-          <p className="t-body text-black/50">
-            약 5,300여 개의<br className="hidden sm:block" /> 기업과 함께해왔습니다.
-          </p>
+        <div className="flex flex-col gap-2">
+          <h2
+            className="text-black"
+            style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
+          >
+            Clients
+          </h2>
+          <p className="t-body text-black/50">기업과 기관의 달력 제작을 함께해왔습니다.</p>
         </div>
 
-        {/* -mt-px / -ml-px 로 인접 셀 border를 겹쳐, 마지막 줄이 덜 차도 각 셀이 완결된 박스로 보임 */}
-        <div className="u-head-gap grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-          {CLIENT_NAMES.map((name, i) => (
-            <div key={i} className="-mt-px -ml-px border border-black/12 flex items-center justify-center p-4" style={{ aspectRatio: '3 / 2' }}>
-              <span className="t-caption text-center text-black/35">{name}</span>
+        <div className="mt-8 lg:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+          {CLIENTS.map(c => (
+            <div
+              key={c.name}
+              className="h-[112px] lg:h-[152px] rounded-[8px] bg-black/[0.035] flex items-center justify-center overflow-hidden px-6 lg:px-8"
+            >
+              {c.ideaSrc && c.doitSrc ? (
+                <div className="flex items-center gap-2 lg:gap-2.5 h-full w-full justify-center">
+                  <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" style={{ maxWidth: '46%' }} />
+                  <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" style={{ maxWidth: '46%' }} />
+                </div>
+              ) : (
+                <img
+                  src={c.src}
+                  alt={c.name}
+                  className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} max-w-full max-h-full w-auto h-auto object-contain`}
+                  style={c.scale && c.scale !== 1 ? { transform: `scale(${c.scale})` } : undefined}
+                />
+              )}
             </div>
           ))}
         </div>
-        <p className="mt-4 t-caption text-black/30">
-          * 로고 자리 — 실제 로고 이미지로 교체 예정
-        </p>
       </div>
     </section>
   )
@@ -1958,8 +2208,19 @@ function FaqSection() {
           ))}
         </div>
 
+        {/* FAQ → copyright 전환용 secondary CTA. 빠른상담(Header)보다 낮은 위계로 outline 스타일만 사용 */}
+        <a
+          href="https://www.touchagraphic.com/main/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-10 lg:mt-14 inline-flex w-full sm:w-auto items-center justify-center gap-2 border border-white/40 px-7 py-4 text-[14px] font-medium text-white hover:bg-white hover:text-black transition-colors"
+          style={FAQ_KR}
+        >
+          터치 본 홈페이지 바로가기 →
+        </a>
+
         {/* 사이트 최하단 — 제거된 Contact 에 있던 copyright 를 절제된 형태로만 유지 (새 정보 추가 없음) */}
-        <p className="mt-20 lg:mt-28 text-[11px] text-white/30 font-mono">
+        <p className="mt-10 lg:mt-14 text-[11px] text-white/30 font-mono">
           © 2026 터치어그래픽 · TOUCHGRAPHIC
         </p>
       </div>
@@ -2452,16 +2713,178 @@ function EstimatorPage({ onBack, onConsult }: {
 }
 
 
+// ── Portfolio 전체보기 페이지 (/portfolio) ──────────────────────────────────────
+// 사례가 많지 않으므로 3열 썸네일 grid 대신 "작품 1개 = 큰 section 1개" 세로형
+// editorial feed 로 구성한다. 데이터는 Landing Portfolio 와 같은 PORTFOLIO 를 그대로 재사용하고,
+// 표시 순서만 filterType 기준으로 걸러낸다(원본 데이터·이미지·category 는 변경하지 않음).
+const PORTFOLIO_FILTERS = ['전체', '기업', '기관'] as const
+type PortfolioFilter = (typeof PORTFOLIO_FILTERS)[number]
+
+// Gallery hover panel accent — 표시 전용, PORTFOLIO 데이터/타입은 건드리지 않고 index 로 순환 배정.
+// 원본 터치어그래픽 영상에서 확인된 cyan / mustard / magenta / charcoal 4색을 반복 사용한다.
+const PF_ACCENTS = ['#16B8E6', '#ECA900', '#F50076', '#2A2A2A']
+function pfRgba(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
+  const [filter, setFilter] = useState<PortfolioFilter>('전체')
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+
+  const items = PORTFOLIO
+    .map((item, i) => ({ item, index: i }))
+    .filter(({ item }) => filter === '전체' || item.filterType === filter)
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header page="portfolio" navigate={navigate} />
+
+      {/* Hero — 이미지·장식 없이 넓은 whitespace 와 타이포그래피만으로 구성 */}
+      <section className="bg-white">
+        <div className={SHELL}>
+          <div className="pt-[140px] lg:pt-[236px] pb-[40px] lg:pb-[56px]">
+            <p
+              className="mb-4 lg:mb-6 text-[11px] lg:text-[12px] font-semibold tracking-[0.22em] uppercase text-black/45"
+              style={{ fontFamily: 'Courier New, monospace' }}
+            >
+              Portfolio
+            </p>
+            <h1
+              className="text-black"
+              style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(34px, 6vw, 84px)', lineHeight: 1.18, letterSpacing: '-0.03em' }}
+            >
+              달력으로 완성한<br />브랜드의 장면들.
+            </h1>
+          </div>
+
+          {/* Category filter — 정확히 3개, 즉시 client-side 필터(새로고침 없음) */}
+          <div className="pb-[20px] lg:pb-[28px] flex items-center gap-2.5">
+            {PORTFOLIO_FILTERS.map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className="h-[42px] px-6 rounded-full text-[14px] font-semibold transition-colors leading-none"
+                style={{
+                  ...fontKr,
+                  background: filter === f ? '#1A1A1A' : '#FFFFFF',
+                  color: filter === f ? '#FFFFFF' : '#1A1A1A',
+                  border: filter === f ? '1px solid #1A1A1A' : '1px solid rgba(0,0,0,0.16)',
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Gallery — 기존 터치어그래픽 Portfolio(hover 시 accent color panel이 bottom→top으로 올라오는 인터랙션)를
+          V2 톤으로 재해석. 사례 수가 적어 4열이 아닌 2열로 크게 보여준다. 카드는 거의 붙어 있고(gap 1px)
+          그 틈으로 divider color가 비쳐 하나의 black portfolio board처럼 보인다(desktop 전용, mobile은
+          일반 seotion rhythm). */}
+      <section className="bg-white pb-[100px] lg:pb-[160px]">
+        <div className={SHELL}>
+          <div className="pt-[64px] lg:pt-[88px] grid grid-cols-1 lg:grid-cols-2 gap-y-8 gap-x-0 lg:gap-[1px] lg:bg-black/15 pf-feed-item">
+            {items.map(({ item, index }) => {
+              const accent = PF_ACCENTS[index % PF_ACCENTS.length]
+              return (
+                <div key={`${filter}-${item.title}`}>
+                  <div className="group relative overflow-hidden bg-black" style={{ aspectRatio: '16 / 10' }}>
+                    <img
+                      src={item.src}
+                      alt={item.title}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{
+                        objectPosition: item.objectPosition ?? 'center center',
+                        transform: item.mediaScale ? `scale(${item.mediaScale})` : undefined,
+                      }}
+                    />
+                    {/* hover panel — 기본은 카드 아래로 완전히 내려가 있다가(translate-y-full) hover 시 위로 슬라이드.
+                        데스크톱 전용(lg:group-hover) — 터치 tap 에는 반응하지 않아 모바일에서 어색하게 붙잡히지 않는다. */}
+                    <div
+                      className="absolute inset-0 hidden lg:flex flex-col items-center justify-center text-center px-8
+                                 translate-y-full lg:group-hover:translate-y-0
+                                 transition-transform duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                      style={{ backgroundColor: pfRgba(accent, 0.9) }}
+                    >
+                      <span
+                        className="text-white"
+                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 600, fontSize: 'clamp(20px, 1.8vw, 27px)', letterSpacing: '-0.02em' }}
+                      >
+                        {item.title}
+                      </span>
+                      <span className="text-white/50 my-2.5 leading-none text-[15px]" aria-hidden>+</span>
+                      <span
+                        className="text-white/80"
+                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 400, fontSize: '13px', letterSpacing: '0.01em' }}
+                      >
+                        {item.filterType ?? item.category} · {item.description}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* mobile 전용 — hover 가 없으므로 tile 아래 기본 텍스트를 노출 */}
+                  <div className="lg:hidden pt-3">
+                    <span className="t-caption text-black/45">{item.filterType ?? item.category}</span>
+                    <h3
+                      className="text-black mt-0.5"
+                      style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: '19px', letterSpacing: '-0.02em' }}
+                    >
+                      {item.title}
+                    </h3>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // App 루트
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [view, setView] = useState<AppView>('landing')
   const [sels] = useState<Sels>({ ...DEFAULT_SELS })
+  // 라우터 라이브러리 없이 pathname 만으로 '/' ↔ '/portfolio' 를 전환한다(§AGENTS: 최소 구조).
+  const [route, setRoute] = useState(() => (window.location.pathname === '/portfolio' ? '/portfolio' : '/'))
+  // 다른 라우트로 이동하면서 도착 후 특정 섹션으로 스크롤해야 하는 경우(예: /portfolio → '/' → estimator)를 위한 예약값.
+  const pendingScrollRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    function onPopState() { setRoute(window.location.pathname === '/portfolio' ? '/portfolio' : '/') }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  function navigate(path: string, opts?: { scrollTo?: string }) {
+    pendingScrollRef.current = opts?.scrollTo ?? null
+    if (window.location.pathname !== path) window.history.pushState({}, '', path)
+    window.scrollTo(0, 0)
+    setRoute(path)
+  }
+
+  useEffect(() => {
+    if (route !== '/' || !pendingScrollRef.current) return
+    const id = pendingScrollRef.current
+    pendingScrollRef.current = null
+    requestAnimationFrame(() => scrollToCenter(id))
+  }, [route])
 
   useEffect(() => { if (view === 'landing') return; window.scrollTo(0, 0) }, [view])
 
   function reset() { setView('landing') }
+
+  if (route === '/portfolio') {
+    return <PortfolioPage navigate={navigate} />
+  }
 
   if (view === 'consult') {
     return <ConsultForm sels={sels} onBack={() => setView('landing')} onReset={reset} />
@@ -2469,9 +2892,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+      <Header page="landing" navigate={navigate} />
       <Hero />
-      <Portfolio />
+      <Portfolio navigate={navigate} />
       <EstimatorSection onConsult={() => setView('consult')} />
       <Clients />
       <FaqSection />

@@ -320,15 +320,167 @@ view === 'consult':
 
 ---
 
+## 21. Portfolio 전체보기 페이지 (`/portfolio`) — 2026-09-05 신설
+
+- 라우터 라이브러리 없이 `App()` 이 `window.location.pathname` 을 `route` state 로 들고 있다가
+  `/portfolio` 면 `PortfolioPage`, 그 외엔 기존 landing/consult 트리를 렌더(`src/App.tsx` `App()`).
+  `navigate(path, { scrollTo? })` 함수가 `history.pushState` + `setRoute` + (필요 시) 도착 후
+  `scrollToCenter` 예약(`pendingScrollRef`)을 담당. `popstate` 리스너로 뒤로가기/앞으로가기 대응.
+- Netlify SPA fallback: `public/_redirects` = `/*    /index.html   200` (신규 파일, 빌드 시 `dist/_redirects` 로 복사됨 확인)
+- **Header** — 기존 컴포넌트 그대로 재사용, `page`(`'landing' | 'portfolio'`) + `navigate` prop 추가:
+  - landing 에서 `제작 사례` 클릭 → `/portfolio` 이동. portfolio 에서 클릭 → 현재 페이지 맨 위로 스크롤
+  - landing 에서 `견적 계산하기` 클릭 → 기존처럼 `#estimator-scroll-target` 로 센터 스크롤(변경 없음)
+  - portfolio 에서 `견적 계산하기` 클릭 → `/` 로 이동 후 estimator 로 자동 스크롤(`navigate('/', { scrollTo: 'estimator-scroll-target' })`)
+  - `scrollToCenter` 를 Header 내부에서 모듈 스코프 함수로 추출(App 의 pending-scroll 이펙트와 공유)
+- **Landing Portfolio** — `포트폴리오 전체보기 ›` 를 `<span>` → `<button onClick={() => navigate('/portfolio')}>` 로 변경한 것 외 캐러셀/화살표/모션은 그대로
+- **데이터** — 새 이미지 없이 기존 `PORTFOLIO` 배열을 그대로 재사용. 표시용 `category` 는 손대지 않고
+  `filterType?: '기업' | '기관'` 필드만 각 항목에 추가(대한상공회의소·한국수목정원관리원·함평군농업기술센터 = 기관,
+  아이디어두잇·동아쏘시오그룹·세종스포츠정형외과·IMAGINE SEOUL = 기업)
+- **PortfolioPage 구조** (`src/App.tsx` `PortfolioPage`): Header → hero(`PORTFOLIO` 라벨 + 대형 headline, 이미지 없음) →
+  필터 pill 3개(전체/기업/기관, `useState` 즉시 전환, 그리드 재배열 애니메이션 없이 `.pf-feed-item` 짧은 opacity fade만) →
+  세로 feed(작품 1개 = section 1개, index/category → title → 큰 이미지(object-cover, 카드별 `objectPosition`/`mediaScale` 재사용) → 한 줄 설명, hairline `border-t` 구분)
+  - 이미지 비율은 최초 16:9 → 4:3(rail과 동일 크롭) 을 거쳐, 2026-09-05 밀도 조정에서 **16:10 + max-width 1200px** 로 최종 조정(아래 참고)
+  - 클릭 시 상세 페이지 등은 이번 범위에 없음(목록/갤러리까지만)
+- **2026-09-05 밀도 조정**(구조는 그대로, spacing/media scale만): 1작품=1섹션 구조·필터 로직·데이터는 변경하지 않고
+  desktop 화면에서 이미지가 과도하게 압도적으로 보이던 문제만 조정
+  - hero/filter → 첫 작품: filter 컨테이너 `pb-[64px] lg:pb-[96px]` → `pb-[20px] lg:pb-[28px]`,
+    첫 article만 `pt-[40px] lg:pt-[64px]`(다른 article은 `pt-[56px] lg:pt-[80px]`)로 분리 →
+    desktop 체감 간격 약 200px → 약 92px
+  - 이미지: `w-full`(shell 거의 전체 폭) → `w-full max-w-[1200px]`(왼쪽 정렬 유지, title과 동일 축),
+    비율 `4:3` → `16:10`(제품이 심하게 잘리지 않는 선에서 더 가로로 넓고 덜 압도적인 프레임).
+    `objectPosition`/`mediaScale` 등 `PORTFOLIO` 데이터 자체는 이번에도 변경하지 않음
+  - article 상하 padding `pt/pb-[64px] lg:pt/pb-[104px]` → `pt/pb-[56px] lg:pt/pb-[80px]`
+    (아이템 간 간격 desktop 약 208px → 약 160px, 목표 범위 110~160px 상단에 맞춤)
+  - 대한상공회의소는 16:10에서 검은 여백이 거의 사라짐. 한국수목정원관리원(mediaScale 1.5)은 여전히 좌우
+    검은 여백이 일부 남아있음 — Landing rail 에서도 동일하게 나타나는 현상(§6)이라 데이터 미변경 원칙상 그대로 둠
+  - localhost 검수: 1~7번 항목 스크롤하며 간격/이미지 크기 확인, hero→첫 항목 간격 확연히 축소, 이미지가
+    화면을 덜 압도하면서도 존재감 유지 확인. 모바일은 이번에도 `resize_window` 도구 미응답으로 실측 스킵 —
+    `max-w-[1200px]`은 좁은 뷰포트에서 바인딩되지 않아(w-full 우선) mobile 폭 축소 없음
+  - `npm run build` 성공
+
+### 21-2. `max-w-[1200px]` 단일 컬럼 → LEFT INFO + RIGHT IMAGE 2-column editorial (2026-09-05, 최신)
+
+- §21-1 에서 이미지에 `max-w-[1200px]` 를 걸었더니, 넓은 desktop 화면에서 이미지가 shell 안에서 왼쪽에
+  붙고 오른쪽에 큰 white space 가 남는 문제 발생(특히 `기업/기관` category 가 shell 우측 끝에 따로 떠서
+  title/image 와 한 composition 처럼 안 보임). **2 projects per row / masonry / thumbnail grid 로 바꾸지
+  않고**, "1 project = 1 section" 구조를 유지한 채 각 section 내부를 좌우 2단으로 재구성해 이 공백을
+  info 영역으로 흡수
+- 각 `<article>` 내부에 새 wrapper `div.max-w-[1440px] grid grid-cols-1
+  lg:grid-cols-[minmax(280px,0.28fr)_minmax(0,1fr)] gap-8 lg:gap-[88px] items-start` 추가
+  (computed: 데스크톱 첫 컬럼 ≈296px, 둘째 컬럼 ≈1056px — 요청 범위 260~320px/70~100px gap 안에 들어옴)
+  - **left info**(DOM 순서상 첫번째, mobile 1열일 때 자연히 위로 감): index → `기업/기관`(우측에 따로 떠
+    있던 걸 이 안으로 이동) → title → description, 전부 세로 stack. `items-start` 로 image 상단과
+    수직 정렬(중앙 정렬 아님)
+  - **right image**: `max-w-[1200px]` 제거, 컬럼 100% 사용(`w-full`, object-cover, 비율은 §21-1의
+    16:10 그대로 유지, `objectPosition`/`mediaScale` 등 `PORTFOLIO` 데이터는 여전히 미변경)
+  - description 의 `max-w-[560px]` 도 제거(컬럼 자체가 이미 좁아 불필요)
+  - article 상하 padding·hairline divider·hero→첫 항목 간격(§21-1 값 그대로) 은 이번엔 건드리지 않음 —
+    이미 90~110/110~160 목표 범위 안이라 재조정 불필요했음
+- **filter 유지**: `전체/기업/기관` 클릭 시 남은 항목들이 동일한 2-column 구조로 그대로 재배치, filter
+  로직 자체는 무변경
+- **localhost 검수**: 대한상공회의소→아이디어두잇→한국수목정원관리원 연속 스크롤, 오른쪽 white space
+  완전히 사라짐, info/image 가 하나의 composition 처럼 보임, category 가 더 이상 우측에 안 뜸,
+  `기업` 필터 클릭 후에도 레이아웃 정상 유지 확인. 긴 title(`한국수목정원관리원`)은 좁아진 info 컬럼에서
+  자연스럽게 2줄로 줄바꿈됨(허용 범위). 모바일은 이번에도 `resize_window` 도구 미응답으로 실측 스킵 —
+  `grid-cols-1 lg:grid-cols-[...]` 구조상 `lg` 미만에서는 DOM 순서(정보→이미지) 그대로 1열 stack 되고
+  이미지에 폭 제한이 없어 좁아질 위험 없음
+- `npm run build` 성공
+- **localhost 검수 완료**(Claude in Chrome): Header `제작 사례` → `/portfolio` 이동, hero/필터 확인, `기업`/`기관`/`전체` 필터 정상 전환,
+  전체 7개 항목 끝까지 스크롤 확인, `/portfolio` 직접 URL 진입 정상, portfolio → `견적 계산하기` → `/` 이동 후 estimator 스크롤 정상,
+  landing `포트폴리오 전체보기` → `/portfolio` 이동 정상
+  - 모바일 뷰포트 실측은 이번 세션에서 `resize_window` 도구가 응답하지 않아(브라우저 창이 리사이즈되지 않음) 스킵 —
+    코드는 다른 섹션과 동일한 `SHELL`/`clamp()` 타이포/단일 컬럼 패턴만 사용해 가로 overflow 위험 요소 없음
+- `npm run build` 성공(오류 없음)
+
+---
+
+## 22. Clients — 로고 wall → 텍스트 block archive 로 재설계 (2026-09-05, 최신)
+
+- 2026-09-05 오전에 만든 실제 로고 12종 logo wall(위 이력, `CLIENTS: ClientLogo[]` + `client-logos/*` import)을
+  다시 완전히 걷어내고 **텍스트 전용 block grid**로 교체. `src/imports/client-logos/` 파일 자체는 삭제하지
+  않고 그대로 두되(요청대로), `App.tsx`의 import/타입/데이터/렌더는 로고를 전혀 참조하지 않음
+  (`npm run build` 결과 dist에 client-logos 에셋 미포함 확인 — 실제 번들에서도 빠짐)
+- **데이터**: `CLIENT_NAMES: string[]` 12개, 텍스트만. 표기 확정: `한국수목원정원관리원`(구 표기
+  `한국수목정원관리원` 아님 — 공식 명칭으로 수정)
+- **Clients heading**: 기존 `t-display`(Noto Serif KR) → Header/Portfolio 와 동일한 Noto Sans KR 700
+  인라인 스타일로 교체(장식 serif 제거, 사이트 전역 고딕 계열과 통일). 옆 카피
+  `약 5,300여 개의 기업과 함께해왔습니다.`는 문구 그대로 유지
+- **grid**: `grid-cols-2 lg:grid-cols-4`(모바일·태블릿 2열, desktop 4×3), `gap-3 lg:gap-4`(로고 wall 때보다
+  훨씬 촘촘 — reference 처럼 block 사이가 붕 뜨지 않게). 셀은 `h-[112px] lg:h-[152px] rounded-[8px]
+  bg-black/[0.035]`(subtle gray, border/shadow/gradient/아이콘 없음), 브랜드명은 Noto Sans KR 600
+  `clamp(18px, 1.6vw, 22px)` 중앙 정렬(가로/세로 모두, 모든 카드 동일 규칙)
+  - 순서(요청 프롬프트의 ASCII 예시 그대로): 1행 동아제약·세종스포츠정형외과·한국수목원정원관리원·
+    대한상공회의소 / 2행 이글루코퍼레이션·경기도중독관리통합지원센터·함평군 농업기술센터·한국가스기술공사 /
+    3행 한국환경산업기술원·아이디어두잇·설빙·대구오페라하우스
+- **인터랙션 없음**: marquee/auto-scroll/hover 모션 전부 배제, 완전 정적 composition
+- **localhost 검수**: 12개 전부 표시, 정확히 4×3, 긴 기관명도 desktop 4열 폭에서 한 줄로 들어감,
+  Estimator↔Clients / Clients↔black FAQ 전환 여백 자연스러움 확인. 모바일 실측은 이번에도
+  `resize_window` 도구가 이 세션에서 응답하지 않아 스킵 — 코드는 고정 px 폭 없이 `grid-cols-2` 기반이라
+  가로 overflow 위험 없음
+- `npm run build` 성공. JS 번들이 이전(로고 wall, 260.77KB)보다 작아짐(245.90KB) — client-logos 에셋들이
+  더 이상 참조되지 않아 빌드에서 빠졌기 때문(§15 이미지 용량 이슈와는 무관, 원본 파일은 그대로 보존됨)
+
+### 22-1. 텍스트 block → 실제 로고 + monochrome block 로 재재설계 (2026-09-05, 최신)
+
+- 위 텍스트 전용 block(`CLIENT_NAMES: string[]`)을 다시 걷어내고 `src/imports/client-logos/*` 실제 로고
+  12종을 재사용하는 `CLIENTS: ClientLogo[]`(§21-2026-09-05 첫 로고 wall 시도와 같은 타입 모양,
+  `{ name, src, scale?, blend? }` 또는 아이디어두잇만 `{ name, ideaSrc, doitSrc }`)로 교체. 원본 로고 파일은
+  이번에도 전혀 수정하지 않음(recolor/crop 없음) — **화면에서만** CSS로 monochrome 처리
+- **monochrome 처리** (`index.css` `.cl-logo`): `filter: url(#cl-mono-alpha-cut) brightness(0); opacity: 0.8`.
+  `brightness(0)`은 원본 hue/명도와 무관하게 모든 로고를 동일한 짙은 톤으로 만들어 "브랜드별로 다른 gray
+  tone" 문제를 원천 차단(grayscale+brightness+contrast 조합보다 훨씬 안정적)
+  - `#cl-mono-alpha-cut`은 `Clients` 컴포넌트 안에 넣은 숨김 `<svg><filter>`(`feComponentTransfer`/
+    `feFuncA type="discrete"`)로, alpha 0.5 미만 픽셀을 완전히 지운다. 일부 로고 PNG(특히 `korcham.png`)에
+    디자인 캔버스의 옅은 반투명 그리드가 실수로 함께 export 돼 있어, `brightness(0)`만 쓰면 그 그리드까지
+    검게 보여 지저분해지는 문제가 있었음 — 이 필터로 실제 로고 획(거의 불투명)만 남기고 그리드(저투명도)는
+    제거
+  - **`igloo.svg`/`daegu-opera.png`는 예외**(`blend: true` → `.cl-logo-blend`, `filter: grayscale(1)
+    contrast(9); opacity: 0.85; mix-blend-mode: multiply`): 두 파일은 alpha 자체가 100%인 **불투명 흰
+    배경**이 내장돼 있어(`brightness(0)`을 쓰면 배경까지 완전히 검게 칠해져 로고가 안 보이는 결함 발견 →
+    localhost 확인 중 igloo가 완전 검은 사각형으로 렌더되는 걸 보고 원인 파악) alpha-cut 필터가 통하지
+    않는다. 대신 `mix-blend-mode: multiply`로 흰 배경을 카드 배경에 녹여 지우고, `grayscale(1)
+    contrast(9)`로 로고 자체(특히 daegu-opera의 옅은 "Daegu" 서브텍스트)를 다른 로고와 비슷한 짙기까지
+    끌어올림(대구오페라하우스 원본에 "Daegu"/"Opera house" 두 글자가 서로 다른 밝기로 그려져 있어 contrast를
+    2.2 → 5 → 9 로 3차례 재조정)
+  - hover 시 `opacity: 1`(원색 복원/scale/translate/shadow 없음, 요청 범위 내 유일한 motion)
+- **size normalization**: `scale`(표시 전용 `transform: scale()`, 기본 1) — 로고 대부분은 원본 캔버스에
+  실제 내용이 이미 꽉 차 있어 `scale: 1` 그대로 두고, 캔버스 여백이 큰 로고만 확대: 대한상공회의소 1.7,
+  이글루코퍼레이션 1.8, 한국수목원정원관리원 1.15(얇은 파스텔 라인이라 살짝 보정). 셀은
+  `h-[112px] lg:h-[152px]`(§22 로고 wall 때의 `h-[46px]/[60px]`보다 훨씬 큼) + `overflow-hidden`이라
+  `scale`이 지나치면 워드마크 끝이 crop될 위험이 있어, 이번엔 대부분 1로 유지하는 쪽으로 보수적으로 접근
+- **아이디어두잇**: 기존과 동일하게 `ideaSrc`/`doitSrc` 두 이미지를 한 셀에서 `gap-2 lg:gap-2.5` +
+  각 `maxWidth: 46%`로 나란히 배치
+- **heading**: 옆 카피 `약 5,300여 개의 기업과 함께해왔습니다.` → `기업과 기관의 달력 제작을
+  함께해왔습니다.`로 교체(성과 숫자 제거). heading↔grid 간격은 `u-head-gap` → `mt-8 lg:mt-10`(더 조밀하게)
+- **localhost 검수**: 12개 전부 정상 렌더, 톤 통일 확인(zoom으로 대한상공회의소/이글루/설빙/대구오페라
+  근접 비교), 4×3 grid, IGLOO·대구오페라 불투명 배경 결함 발견 후 수정 완료, korcham 그리드 아티팩트 발견
+  후 alpha-cut 필터로 해결(완전히는 아니고 아주 옅은 라인 1px 정도 잔존 — 육안상 거의 인지 불가 수준),
+  Clients↔FAQ 전환 확인. 모바일은 이번에도 `resize_window` 도구 미응답으로 실측 스킵(§21/§22 동일 제약,
+  코드는 `grid-cols-2` 고정 폭 없이 구성)
+- `npm run build` 성공(client-logos 에셋 재포함으로 JS 번들 245.90KB → 261.39KB)
+
+## 23. Header 로고 → Home 링크 (2026-09-05)
+
+- Header 좌측 `터치어그래픽` 텍스트 로고를 `<a href="/">`로 유지하되 `onClick`에서 `preventDefault` 후
+  현재 위치에 따라 분기: landing(`page==='landing'`)이면 맨 위로 스크롤, `/portfolio`면
+  `navigate('/')`로 이동(§21의 `navigate` prop 재사용, 새 상태/로직 추가 없음)
+  - `handleLogoClick`을 Header 내부에 추가한 것 외 디자인(className/style)은 완전히 그대로 —
+    underline·버튼화 없음, 위치/크기 변경 없음
+- **localhost 검수**: `/`에서 로고 클릭 → 상단으로 스크롤, `/portfolio`에서 로고 클릭 → `/`로 이동 후
+  Hero/제작 사례 정상 렌더 확인
+- `npm run build` 성공
+
+---
+
 ## 12. 아직 해결해야 할 문제
 
 | # | 위치 | 문제 |
 |---|------|------|
 | 1 | Header | `빠른상담`(데스크톱) / `제작 문의`(모바일) 버튼이 `#contact` 를 가리키나 대상 섹션 없음 → 클릭 시 스크롤 안 됨 |
 | 2 | Header | `빠른상담` 배경 `#1E50E0` 임시색, `회사소개서` 버튼 `href="#"` 미연결 |
-| 3 | Portfolio | `포트폴리오 전체보기 ›` 링크 미연결 |
+| 3 | Portfolio | ~~`포트폴리오 전체보기 ›` 링크 미연결~~ → 2026-09-05 해결. `/portfolio` 전체보기 페이지 신설(§21) |
 | 4 | Portfolio | 7개 대표컷 최종 선정·`objectPosition`·`mediaScale` 미확정 (후보 비교 중) |
-| 5 | Clients | 실제 로고 이미지 없음 — 텍스트 placeholder. 명단 확정 여부 미확인 |
+| 5 | Clients | ~~실제 로고 이미지 없음~~ → 2026-09-05 해결. 실제 12개 클라이언트 로고 wall 로 교체(§22) |
 | 6 | consult 뷰 | `sels` 가 항상 빈 값 → 요약 6개가 전부 `—`. 폼 실제 전송 없음 |
 | 7 | 전역 | Service / Contact / Consultation / 구 FAQ / Footer / EstimatorPage 등 미렌더 레거시 다량 잔존 — 정리 여지(요청 시에만) |
 | 8 | 전역 | accent 색 불일치(`#FF2D16` / `#1E50E0` / `#1A1A1A` / `#D65A34` 계열) — 브랜드색 확정 후 정리 |
