@@ -177,6 +177,37 @@ body {
 .u-rail-pad {
   padding-inline: clamp(20px, 5vw, 100px);
 }
+/* 2026-09-07 refinement — "좌: 텍스트 / 우: 컨트롤·서브카피" 형태의 heading row가 .u-shell
+   풀와이드 안에 그대로 놓이면 wide desktop(1600px+)에서 둘 사이에 극단적으로 큰 빈 공간이
+   생겨 "떠 있는 라벨"처럼 보인다(Hero/Portfolio heading/Estimator masthead/FAQ accordion 공통
+   문제로 실측됨). .u-shell의 좌측 시작선은 그대로 두고 이 콘텐츠 블록의 최대 폭만 제한해 좌우
+   요소가 하나의 조형으로 묶이게 한다. margin-inline 없음 — 왼쪽 정렬 유지, 오른쪽만 캡. */
+.u-content-max {
+  max-width: 1600px;
+}
+/* Portfolio 갤러리 전용 wide breakout — Hero/filter는 .u-shell(contained)을 그대로 쓰고
+   4-column 작품 wall만 viewport 거의 전체 폭을 쓰도록 확장한다(기존 터치어그래픽 portfolio의
+   점유율에 맞춤). max-width 캡 없이 좌우 약 12~20px 수준의 최소 breathing margin만 남긴다. */
+.u-gallery-wide {
+  width: calc(100vw - clamp(24px, 2vw, 40px));
+  margin-inline: auto;
+}
+/* Inquiry 페이지 전용 wide sheet — intro/01/02/03/privacy/submit 이 전부 이 안에서 같은
+   좌우 축을 공유한다(예전엔 .u-shell 안에 max-w-[1200px] 가 이중으로 들어가 있어 desktop에서
+   과하게 좁았음). 1024px 미만(태블릿·모바일)은 기존 .u-shell 수준의 가벼운 단일 padding으로
+   fallback해 desktop 공식이 중첩 축소를 일으키지 않게 한다 — 모바일 좌우 20~24px 유지. */
+.u-inquiry-wide {
+  width: 100%;
+  padding-inline: clamp(20px, 4vw, 32px);
+}
+@media (min-width: 1024px) {
+  .u-inquiry-wide {
+    width: calc(100vw - clamp(48px, 5vw, 112px));
+    max-width: 1840px;
+    margin-inline: auto;
+    padding-inline: clamp(28px, 4vw, 72px);
+  }
+}
 
 /* ── 섹션 세로 리듬 (인접 섹션 padding이 합쳐지는 점을 감안한 값) ── */
 .u-section    { padding-block: clamp(60px, 7.5vw, 116px); }  /* 일반 대형 섹션 */

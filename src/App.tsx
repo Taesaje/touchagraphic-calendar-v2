@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 
+import { CALENDAR_PORTFOLIO, getCalendarProjectByIdx } from '@/data/calendarPortfolio'
+
 import calendarCover  from '@/imports/1.jpg'
 import calendarSpread from '@/imports/6.jpg'
 import calendarHeld   from '@/imports/5.jpg'
@@ -348,7 +350,7 @@ function scrollToCenter(id: string) {
 // page: 현재 어느 화면에서 렌더되는지('landing' | 'portfolio'). navigate: App 이 소유한 route 전환 함수.
 // '제작 사례' / '견적 계산하기' 는 landing 에서는 기존처럼 같은 페이지 내 스크롤, /portfolio 에서는
 // 서로의 페이지로 이동(+ 필요 시 이동 후 스크롤 위치 예약)하도록 분기한다.
-function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'; navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
+function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio' | 'portfolio-detail' | 'inquiry'; navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
   function scrollToContact() {
     document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -359,6 +361,14 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
       return
     }
     navigate('/')
+  }
+  function handleInquiryClick(e: React.MouseEvent) {
+    e.preventDefault()
+    if (page === 'inquiry') {
+      window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+      return
+    }
+    navigate('/inquiry')
   }
   function handleNavClick(e: React.MouseEvent, targetId: string) {
     e.preventDefault()
@@ -400,10 +410,10 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
         {/* 우: 액션 버튼 */}
         <div className="justify-self-end flex items-center gap-2">
           <div className="hidden lg:flex items-center">
-            <a href="#contact"
+            <a href="/inquiry" onClick={handleInquiryClick}
               className="inline-flex items-center justify-center h-[54px] lg:min-w-[148px] px-[30px] rounded-[10px] text-[16px] font-bold text-white leading-none transition-opacity hover:opacity-90"
               style={{ ...fontKr, background: '#1E50E0' }}>
-              빠른상담
+              상담 문의
             </a>
           </div>
           <button onClick={scrollToContact}
@@ -429,39 +439,55 @@ function Hero() {
     <section className="bg-white">
       <div className={SHELL}>
         {/* 상단 pt = 고정 헤더 높이 + reference의 헤더→descriptor 간격.
-            하단 pb는 Portfolio 섹션과의 시각적 공백을 줄이기 위해 축소 (Hero 내부 배치는 불변). */}
-        <div className="pt-[112px] lg:pt-[200px] pb-[44px] lg:pb-[80px]">
-          {/* descriptor + headline 을 하나의 title group 으로 — 간격 좁게, descriptor 는 작은 heading 톤 */}
-          <p className="mb-3 lg:mb-[10px] text-[13px] lg:text-[16px] font-normal text-black/80" style={fontKr}>
-            기업·기관 맞춤 달력 기획·디자인·제작
-          </p>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-10 lg:gap-x-8">
-            {/* 좌: 큰 2줄 headline — 줄 간격은 line-height로만 (flex gap 미사용) */}
-            <h1
-              className="lg:col-span-7 min-w-0 text-black"
-              style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(36px, 4.6vw, 66px)', lineHeight: 1.3, letterSpacing: '-0.025em' }}
+            하단 pb: 2026-09-07 refinement — Hero→Portfolio 전환을 좀 더 빠르게 이어지도록 축소
+            (80→56 / 44→36, Portfolio 쪽 pt 축소와 함께 적용. Hero 내부 배치는 불변). */}
+        <div className="pt-[112px] lg:pt-[200px] pb-[36px] lg:pb-[56px]">
+          {/* 2026-09-07 refinement — wide desktop(1600px+)에서 좌측 headline과 우측 supporting
+              copy 사이 gutter가 실측 1000px+ 로 벌어져 두 블록이 "떠 있는" 것처럼 보이던 문제를
+              u-content-max(1600px 캡)로 해결. 좌측 시작선(.u-shell)은 그대로 유지. */}
+          <div className="u-content-max">
+            {/* descriptor + headline 을 하나의 title group 으로 — 간격 좁게, descriptor 는 작은 heading 톤 */}
+            <span
+              className="inline-flex items-center gap-2 rounded-full mb-4 lg:mb-[18px] text-[11px] lg:text-[12px] font-semibold text-black/80"
+              style={{ ...fontKr, letterSpacing: '-0.01em', border: '0.8px solid rgba(0,0,0,0.35)', padding: '3px 12px' }}
             >
-              기업 / 기관<br />달력 제작 회사
-            </h1>
+              <span className="flex gap-[3px]" aria-hidden>
+                <span className="w-[5px] h-[5px] rounded-full" style={{ background: '#4CACE9' }} />
+                <span className="w-[5px] h-[5px] rounded-full" style={{ background: '#DB438F' }} />
+                <span className="w-[5px] h-[5px] rounded-full" style={{ background: '#FDF251' }} />
+                <span className="w-[5px] h-[5px] rounded-full bg-black/80" />
+              </span>
+              기업·기관 맞춤형 달력 제작 회사
+            </span>
 
-            {/* 우: supporting — headline 2번째 줄 기준선에 맞춰 하단 정렬. 위계: 1줄 medium(500) / 2줄 bold(700) */}
-            <div className="lg:col-span-4 lg:col-start-9 min-w-0 flex lg:items-end lg:justify-end">
-              <div className="max-w-[540px] text-black lg:text-right" style={fontKr}>
-                <span
-                  className="block"
-                  style={{ fontWeight: 500, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.015em' }}
-                >
-                  달력 잘 만드는 전문 디자이너가
-                </span>
-                <span
-                  className="mt-2 flex items-center gap-3.5 flex-wrap lg:justify-end"
-                  style={{ fontWeight: 700, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.02em' }}
-                >
-                  기획부터
-                  <span aria-hidden className="inline-block h-px w-16 shrink-0 bg-black/35" />
-                  제작까지 함께합니다
-                </span>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-10 lg:gap-x-8">
+              {/* 좌: 큰 2줄 headline — 줄 간격은 line-height로만 (flex gap 미사용). 2026-09-07: wide
+                  desktop에서 존재감을 키우기 위해 clamp 상한 66px→80px */}
+              <h1
+                className="lg:col-span-7 min-w-0 text-black"
+                style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(36px, 5.2vw, 80px)', lineHeight: 1.14, letterSpacing: '-0.025em' }}
+              >
+                기업 / 기관<br />달력 제작 회사
+              </h1>
+
+              {/* 우: supporting — headline 2번째 줄 기준선에 맞춰 하단 정렬. 위계: 1줄 medium(500) / 2줄 bold(700) */}
+              <div className="lg:col-span-4 lg:col-start-9 min-w-0 flex lg:items-end lg:justify-end">
+                <div className="max-w-[540px] text-black lg:text-right" style={fontKr}>
+                  <span
+                    className="block"
+                    style={{ fontWeight: 500, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.015em' }}
+                  >
+                    전문 디자이너가
+                  </span>
+                  <span
+                    className="mt-2 flex items-center gap-3.5 flex-wrap lg:justify-end"
+                    style={{ fontWeight: 700, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.02em' }}
+                  >
+                    기획부터
+                    <span aria-hidden className="inline-block h-px w-16 shrink-0 bg-black/35" />
+                    제작까지 함께합니다
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -803,7 +829,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
 
   return (
-    <section id="portfolio" className="bg-white pt-[52px] pb-[76px] md:pb-[96px] lg:pt-[124px] lg:pb-[160px]">
+    <section id="portfolio" className="bg-white pt-[44px] pb-[64px] md:pb-[84px] lg:pt-[92px] lg:pb-[132px]">
       {/* 헤더: 일반 content shell — 좌측 시작선이 첫 카드 시작선과 연결됨. 제목 ↔ 전체보기 같은 라인 */}
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
@@ -1632,7 +1658,8 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p className="text-[10.5px] text-ink-light/50" style={fontKr}>
-            부가세·인쇄·배송 실비 별도 · 최종 견적은 상담 후 확정됩니다.
+            부가세.인쇄.배송비 별도<br />
+            최종 견적은 상담 후 확정됩니다.
           </p>
           <p className="text-[10.5px] text-ink-light/40 shrink-0 tabular-nums" style={fontKr}>기준일 {todayStr}</p>
         </div>
@@ -2068,7 +2095,7 @@ const FAQ_QA = [
     a: '터치어그래픽은 기업·기관을 위한 달력을 기획하고 디자인·제작하는 전문 스튜디오입니다. 간단한 템플릿형 제작부터 브랜드에 맞춰 처음부터 설계하는 맞춤형 달력까지, 기획·디자인·제작·납품 전 과정을 함께 진행합니다.',
   },
   {
-    q: '다른 회사와 달력 서비스의 차이가 있나요?',
+    q: '터치어그래픽만의 차별점이 있나요?',
     a: '단순히 정해진 달력을 인쇄하는 데 그치지 않고, 브랜드의 목적과 분위기에 맞춰 기획과 디자인부터 함께할 수 있다는 점이 가장 큰 차이입니다. 예산을 낮춘 템플릿형부터 표지·내지·그래픽·후가공까지 새롭게 설계하는 풀커스텀 제작까지 폭넓게 대응합니다.',
   },
   {
@@ -2133,7 +2160,7 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
         aria-expanded={isOpen}
         aria-controls={`faq-panel-${index}`}
         onClick={onToggle}
-        className="faq-q group w-full flex items-start justify-between gap-6 py-6 lg:py-7 text-left cursor-pointer"
+        className="faq-q group w-full flex items-start justify-between gap-6 py-5 lg:py-6 text-left cursor-pointer"
       >
         <span
           className="min-w-0 text-white"
@@ -2161,7 +2188,7 @@ function FaqRow({ item, index, isOpen, onToggle }: { item: { q: string; a: strin
       >
         <div ref={innerRef}>
           <p
-            className="max-w-[820px] pb-6 lg:pb-7"
+            className="max-w-[820px] pb-5 lg:pb-6"
             style={{ ...FAQ_KR, fontWeight: 400, fontSize: 'clamp(15px, 1vw, 16px)', lineHeight: 1.8, color: 'rgba(255,255,255,0.7)' }}
           >
             {item.a}
@@ -2178,7 +2205,7 @@ function FaqSection() {
   // 사이트의 마지막 섹션 — 제거된 Contact 의 full-width black 몰입/마무리 역할을 이어받는다.
   // 배경은 Contact 와 동일한 bg-black. 상·하 padding 을 늘려 "마지막 장면" 여백을 확보한다.
   return (
-    <section id="faq" className="bg-black text-white pt-[80px] lg:pt-[140px] pb-[100px] lg:pb-[160px] scroll-mt-24">
+    <section id="faq" className="bg-black text-white pt-[64px] lg:pt-[112px] pb-[100px] lg:pb-[160px] scroll-mt-24">
       {/* wide layout — 위 Estimator 와 동일한 SHELL 폭을 그대로 사용 (질문/divider/아이콘 = wide) */}
       <div className={SHELL}>
         {/* 상단 label — orange dot + text (#FF2D16) 유지 */}
@@ -2196,7 +2223,7 @@ function FaqSection() {
         </h2>
 
         {/* accordion — 첫 줄 위에도 hairline. 답변 <p> 만 readable width 로 제한 */}
-        <div className="mt-9 lg:mt-12 border-t border-white/20">
+        <div className="mt-8 lg:mt-10 border-t border-white/20">
           {FAQ_QA.map((item, i) => (
             <FaqRow
               key={i}
@@ -2213,14 +2240,14 @@ function FaqSection() {
           href="https://www.touchagraphic.com/main/"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-10 lg:mt-14 inline-flex w-full sm:w-auto items-center justify-center gap-2 border border-white/40 px-7 py-4 text-[14px] font-medium text-white hover:bg-white hover:text-black transition-colors"
+          className="mt-8 lg:mt-12 inline-flex w-full sm:w-auto items-center justify-center gap-2 border border-white/40 px-7 py-4 text-[14px] font-medium text-white hover:bg-white hover:text-black transition-colors"
           style={FAQ_KR}
         >
           터치 본 홈페이지 바로가기 →
         </a>
 
         {/* 사이트 최하단 — 제거된 Contact 에 있던 copyright 를 절제된 형태로만 유지 (새 정보 추가 없음) */}
-        <p className="mt-10 lg:mt-14 text-[11px] text-white/30 font-mono">
+        <p className="mt-8 lg:mt-10 text-[11px] text-white/30 font-mono">
           © 2026 터치어그래픽 · TOUCHGRAPHIC
         </p>
       </div>
@@ -2733,9 +2760,12 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
   const [filter, setFilter] = useState<PortfolioFilter>('전체')
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
 
-  const items = PORTFOLIO
+  // 2026-09-07: 임시 7개 랜딩용 PORTFOLIO 대신 기존 Touchgraphic Calendar Portfolio 실제 17개
+  // (CALENDAR_PORTFOLIO)로 교체. 원본에 기업/기관 분류 metadata가 없어 필터를 임의로 적용하지
+  // 않는다 — 버튼 UI는 그대로 두되(파괴적 변경 금지) "전체" 기준으로 17개가 항상 노출된다.
+  // 실제 기업/기관 분류가 필요하면 별도 데이터 결정이 필요하다(최종 보고 참고).
+  const items = CALENDAR_PORTFOLIO
     .map((item, i) => ({ item, index: i }))
-    .filter(({ item }) => filter === '전체' || item.filterType === filter)
 
   return (
     <div className="min-h-screen bg-white">
@@ -2781,55 +2811,64 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
         </div>
       </section>
 
-      {/* Gallery — 기존 터치어그래픽 Portfolio(hover 시 accent color panel이 bottom→top으로 올라오는 인터랙션)를
-          V2 톤으로 재해석. 사례 수가 적어 4열이 아닌 2열로 크게 보여준다. 카드는 거의 붙어 있고(gap 1px)
-          그 틈으로 divider color가 비쳐 하나의 black portfolio board처럼 보인다(desktop 전용, mobile은
-          일반 seotion rhythm). */}
+      {/* Gallery — 기존 터치어그래픽 Portfolio(touchagraphic.com/portfolio) 의 촘촘한 4열 wall presentation을
+          직접 재현. 각 tile 은 검은 studio 배경 그대로 두고 object-fit: contain 으로 작품 전체를 보여준다
+          (landing rail 전용 objectPosition/mediaScale/cover crop 은 이 페이지에서 override 하여 쓰지 않는다 —
+          PORTFOLIO 데이터 자체는 건드리지 않는다). hairline 은 grid wrapper 배경이 아니라 각 tile 자체의 얇은
+          border로 만든다 — wrapper에 배경을 두면 (7개라 비는) 마지막 빈 셀까지 회색으로 칠해지기 때문에 쓰지
+          않는다. wrapper 자체는 항상 투명(=페이지 white)이라 빈 셀은 그냥 흰 배경으로 보인다.
+          폭: Hero/filter는 .u-shell(contained) 그대로 두고, gallery만 .u-gallery-wide로 breakout —
+          같은 width system을 강제로 맞추지 않고 "contained intro → wide wall" 위계를 준다. */}
       <section className="bg-white pb-[100px] lg:pb-[160px]">
-        <div className={SHELL}>
-          <div className="pt-[64px] lg:pt-[88px] grid grid-cols-1 lg:grid-cols-2 gap-y-8 gap-x-0 lg:gap-[1px] lg:bg-black/15 pf-feed-item">
+        <div className="u-gallery-wide">
+          <div className="pt-[44px] lg:pt-[48px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-8 lg:gap-y-0 gap-x-0 pf-feed-item">
             {items.map(({ item, index }) => {
               const accent = PF_ACCENTS[index % PF_ACCENTS.length]
+              const meta = item.company ?? item.category
               return (
-                <div key={`${filter}-${item.title}`}>
-                  <div className="group relative overflow-hidden bg-black" style={{ aspectRatio: '16 / 10' }}>
+                <button
+                  key={item.idx}
+                  type="button"
+                  onClick={() => navigate(`/portfolio/${item.idx}`)}
+                  className="block w-full text-left cursor-pointer"
+                >
+                  <div className="group relative overflow-hidden bg-black border border-white/[0.22]" style={{ aspectRatio: '3 / 2' }}>
                     <img
-                      src={item.src}
+                      src={item.thumbnail.src}
                       alt={item.title}
+                      width={item.thumbnail.width}
+                      height={item.thumbnail.height}
                       loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      style={{
-                        objectPosition: item.objectPosition ?? 'center center',
-                        transform: item.mediaScale ? `scale(${item.mediaScale})` : undefined,
-                      }}
+                      className="absolute inset-0 w-full h-full object-contain object-center"
                     />
                     {/* hover panel — 기본은 카드 아래로 완전히 내려가 있다가(translate-y-full) hover 시 위로 슬라이드.
-                        데스크톱 전용(lg:group-hover) — 터치 tap 에는 반응하지 않아 모바일에서 어색하게 붙잡히지 않는다. */}
+                        데스크톱 전용(lg:group-hover) — 터치 tap 에는 반응하지 않아 모바일에서 어색하게 붙잡히지 않는다.
+                        4열로 tile 이 작아진 만큼 typography/padding 도 축소했다. */}
                     <div
-                      className="absolute inset-0 hidden lg:flex flex-col items-center justify-center text-center px-8
+                      className="absolute inset-0 hidden lg:flex flex-col items-center justify-center text-center px-4
                                  translate-y-full lg:group-hover:translate-y-0
                                  transition-transform duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
                       style={{ backgroundColor: pfRgba(accent, 0.9) }}
                     >
                       <span
                         className="text-white"
-                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 600, fontSize: 'clamp(20px, 1.8vw, 27px)', letterSpacing: '-0.02em' }}
+                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 600, fontSize: 'clamp(15px, 1.3vw, 19px)', letterSpacing: '-0.02em' }}
                       >
                         {item.title}
                       </span>
-                      <span className="text-white/50 my-2.5 leading-none text-[15px]" aria-hidden>+</span>
+                      <span className="text-white/50 my-1.5 leading-none text-[12px]" aria-hidden>+</span>
                       <span
                         className="text-white/80"
-                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 400, fontSize: '13px', letterSpacing: '0.01em' }}
+                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 400, fontSize: '11px', letterSpacing: '0.01em' }}
                       >
-                        {item.filterType ?? item.category} · {item.description}
+                        {meta}
                       </span>
                     </div>
                   </div>
 
-                  {/* mobile 전용 — hover 가 없으므로 tile 아래 기본 텍스트를 노출 */}
+                  {/* mobile/tablet 전용 — hover 가 없으므로 tile 아래 기본 텍스트를 노출 */}
                   <div className="lg:hidden pt-3">
-                    <span className="t-caption text-black/45">{item.filterType ?? item.category}</span>
+                    <span className="t-caption text-black/45">{meta}</span>
                     <h3
                       className="text-black mt-0.5"
                       style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: '19px', letterSpacing: '-0.02em' }}
@@ -2837,10 +2876,393 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
                       {item.title}
                     </h3>
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ── Portfolio 상세 페이지 (/portfolio/:idx) ──────────────────────────────────────
+// 기존 Touchgraphic 상세페이지(pf_detail.html)의 핵심 presentation을 이식:
+//   - 검은 배경 위에 이미지가 순서대로 edge-to-edge full-bleed로 쌓이는 구조(가로 여백 없음,
+//     crop/stretch 없음, width 100% / height auto, 이미지 사이 얇은 hairline)
+//   - 상단에 프로젝트 제목 + category/date/company 정보(원본에 있는 정보만 사용, 새 카피 없음)
+//   - 원본의 세로 텍스트 사이드바(About/Works/Contact 등 global nav 포함)는 그대로 복제하지
+//     않는다 — site 전체 Header는 V2 것을 그대로 쓰고, 그 아래 detail body만 이식한다(§AGENTS
+//     레퍼런스는 구조·정보 위계만 참고, 장식 그대로 복제 금지와 동일 원칙)
+//   - 원본에 존재하는 이전/다음/목록 네비게이션을 V2 톤의 절제된 텍스트 링크로 재구성
+// 이미지 source는 전부 public/portfolio/calendar/ 최적화 WebP만 사용, references/ 425MB
+// 원본은 참조하지 않는다. 다른 프로젝트의 detailImages는 선택 전까지 렌더/preload되지 않는다.
+function PortfolioDetailPage({ idx, navigate }: { idx: number; navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+  const project = getCalendarProjectByIdx(idx)
+
+  // App() 의 navigate() 가 부르는 legacy 2-인자 window.scrollTo(0,0) 은 전역 CSS
+  // `scroll-behavior: smooth`(index.css) 를 따르는 애니메이션 스크롤이라, 이전 상세 페이지가
+  // 매우 길 때(이미지 10~20장) React가 옛 DOM을 언마운트하면서 애니메이션이 중간에 멈춰
+  // scrollY가 이전 위치에 그대로 남는 문제가 있었다. behavior:'auto' 를 명시하면 CSS smooth를
+  // 무시하고 즉시 이동하므로, idx 가 바뀔 때(첫 진입·이전/다음·뒤로가기 전부 포함)마다 확실히
+  // 맨 위에서 시작하도록 보정한다.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [idx])
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page="portfolio-detail" navigate={navigate} />
+        <div className={`${SHELL} pt-[160px] pb-[160px]`}>
+          <p className="text-black" style={fontKr}>프로젝트를 찾을 수 없습니다.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/portfolio')}
+            className="mt-4 t-caption text-black/55 hover:text-black transition-colors"
+          >
+            ‹ 목록으로
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const listIndex = project.order - 1
+  const prev = listIndex > 0 ? CALENDAR_PORTFOLIO[listIndex - 1] : null
+  const next = listIndex < CALENDAR_PORTFOLIO.length - 1 ? CALENDAR_PORTFOLIO[listIndex + 1] : null
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header page="portfolio-detail" navigate={navigate} />
+
+      {/* 상단 정보 — contained(.u-shell), 원본에서 확인된 정보(title/category/date/company)만 사용 */}
+      <section className="bg-white">
+        <div className={SHELL}>
+          <div className="pt-[112px] lg:pt-[160px] pb-[28px] lg:pb-[36px]">
+            <button
+              type="button"
+              onClick={() => navigate('/portfolio')}
+              className="t-caption text-black/45 hover:text-black transition-colors mb-4 lg:mb-6 inline-block"
+            >
+              ‹ 목록으로
+            </button>
+            <p
+              className="mb-2 text-[11px] lg:text-[12px] font-semibold tracking-[0.22em] uppercase text-black/45"
+              style={{ fontFamily: 'Courier New, monospace' }}
+            >
+              {project.category}{project.date ? ` · ${project.date}` : ''}
+            </p>
+            <h1
+              className="text-black"
+              style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(26px, 4.2vw, 52px)', lineHeight: 1.2, letterSpacing: '-0.02em' }}
+            >
+              {project.title}
+            </h1>
+            {project.company && (
+              <p className="mt-2 text-[14px] text-black/55" style={fontKr}>{project.company}</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 이미지 스택 — 검은 배경, edge-to-edge, 원본 순서 그대로. 처음 2장만 eager, 나머지 lazy.
+          .u-gallery-wide 로 Portfolio 목록과 동일한 wide breakout 축 재사용(새 width 시스템 추가 없음) */}
+      <section className="bg-black">
+        <div className="u-gallery-wide flex flex-col">
+          {project.detailImages.map((img, i) => (
+            <div key={img.order} className="border-b border-white/[0.12] last:border-b-0">
+              <img
+                src={img.src}
+                alt={`${project.title} ${img.order}`}
+                width={img.width}
+                height={img.height}
+                loading={i < 2 ? 'eager' : 'lazy'}
+                style={{ aspectRatio: `${img.width} / ${img.height}` }}
+                className="block w-full h-auto"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 이전/다음/목록 — 원본에 있던 nav를 V2 톤의 절제된 텍스트 링크로 재구성. 거대한 카드/CTA 없음 */}
+      <section className="bg-white">
+        <div className={SHELL}>
+          <div className="py-[40px] lg:py-[56px] flex items-start justify-between gap-4 flex-wrap">
+            {prev ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/portfolio/${prev.idx}`)}
+                className="text-left max-w-[45%]"
+              >
+                <span className="t-caption text-black/45 block mb-1">‹ 이전</span>
+                <span className="text-black text-[13px]" style={fontKr}>{prev.title}</span>
+              </button>
+            ) : <span />}
+            <button
+              type="button"
+              onClick={() => navigate('/portfolio')}
+              className="t-caption text-black/45 hover:text-black transition-colors"
+            >
+              목록으로
+            </button>
+            {next ? (
+              <button
+                type="button"
+                onClick={() => navigate(`/portfolio/${next.idx}`)}
+                className="text-right max-w-[45%]"
+              >
+                <span className="t-caption text-black/45 block mb-1">다음 ›</span>
+                <span className="text-black text-[13px]" style={fontKr}>{next.title}</span>
+              </button>
+            ) : <span />}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// ── 문의 페이지 (/inquiry) ───────────────────────────────────────────────────────
+// 기존 Touchgraphic 문의 페이지(touchagraphic.com/page/inquiry.html)의 layout·spacing·
+// form architecture를 재현: 큰 introduction + 얇은 divider, 번호 붙은 section, 사각형
+// selectable box(01), gray 배경 input/select(02·03), 라벨 옆 magenta dot(필수 표시),
+// 개인정보 동의 체크박스 + outline 화살표 submit 버튼. V2 Header는 그대로 재사용.
+// 기존 Touchgraphic 문의 페이지의 04(프로젝트 상세 타입 accordion)는 이 페이지에 만들지 않는다.
+// 실제 전송 백엔드는 아직 없음 — handleSubmit 의 TODO 참고(touchagraphic.com의 endpoint를 추측해
+// 연결하지 않는다). 여기서는 plan 선택 state만 새로 만들고 Estimator 가격 데이터/로직은 참조하지 않는다.
+type InquiryPlanId = 'basic' | 'custom' | 'highend'
+const INQUIRY_PLANS: { id: InquiryPlanId; name: string }[] = [
+  { id: 'basic',   name: '베이직 (실속형)' },
+  { id: 'custom',  name: '커스텀 (맞춤형)' },
+  { id: 'highend', name: '하이앤드 (기획형)' },
+]
+// 유입경로는 기존에 정의된 옵션이 없어 새로 추가. 사용예정일/프로젝트 예산은 기존 DEADLINE_OPTS/
+// BUDGET_OPTS(§ConsultForm 에서도 사용) 를 그대로 재사용해 새 카피를 만들지 않는다.
+const REFERRAL_OPTS = ['검색 (네이버·구글 등)', 'SNS', '지인·업체 소개', '기존 고객', '기타']
+
+// 기존 Touchgraphic inquiry 의 작은 magenta dot(필수 표시)을 재해석 — Estimator 마스트헤드
+// CMYK 도트에 이미 쓰인 '#DB438F' 를 그대로 재사용(§Portfolio PF_ACCENTS 의 magenta 와도 계열 일치).
+function RequiredDot() {
+  return <span className="inline-block w-[5px] h-[5px] rounded-full align-middle ml-1" style={{ background: '#DB438F' }} aria-hidden />
+}
+
+function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+
+  const [plan, setPlan] = useState<InquiryPlanId | ''>('')
+  const [quantity, setQuantity] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [budget, setBudget] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [detail, setDetail] = useState('')
+  const [company, setCompany] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [referral, setReferral] = useState('')
+  const [website, setWebsite] = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [showPrivacy, setShowPrivacy] = useState(false)
+  const [devNotice, setDevNotice] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!plan) return
+    // TODO: 실제 문의 접수 연동 필요(이메일 전송 / 스프레드시트 / CRM 등 실제 backend endpoint 확정 후 연결).
+    // touchagraphic.com 의 실제 endpoint를 추측해서 연결하지 않는다 — 지금은 폼 검증까지만 확인한다.
+    console.log('[InquiryPage] submit — 백엔드 미연결, 폼 상태만 로그로 확인', {
+      plan, quantity, deadline, budget, fileName, detail, company, contactName, phone, email, referral, website,
+    })
+    setDevNotice(true)
+  }
+
+  const inputCls = "w-full bg-black/[0.035] px-4 py-3 text-[14px] text-black placeholder:text-black/35 focus:outline-none focus:bg-black/[0.06] transition-colors"
+  const labelCls = "flex items-center text-[13px] font-medium text-black mb-2"
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Header page="inquiry" navigate={navigate} />
+
+      <section className="bg-white">
+        {/* 폭: 예전엔 .u-shell 안에 max-w-[1200px] 가 이중으로 들어가 있어 desktop에서 과하게
+            좁았다(§AGENTS-비교 참고). intro/form이 하나의 .u-inquiry-wide(wide sheet) 를 공유해
+            같은 좌우 축에 정렬되도록 SHELL·개별 max-w-[1200px] 를 제거했다. CONTENT/폼 디자인은
+            변경하지 않음 — 폭 구조만 수정. */}
+        <div className="u-inquiry-wide">
+          {/* introduction — reference의 큰 2줄 카피 대신, 새 감성 마케팅 카피를 임의로 짓지 않고
+              문의 페이지 목적에 맞는 절제된 안내 문구만 사용(AGENTS §9) */}
+          <div className="pt-[140px] lg:pt-[200px] pb-[40px] lg:pb-[56px]">
+            <p className="mb-4 lg:mb-6 text-[11px] lg:text-[12px] font-semibold tracking-[0.22em] uppercase text-black/45" style={{ fontFamily: 'Courier New, monospace' }}>
+              Inquiry
+            </p>
+            <h1 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(28px, 4.2vw, 52px)', lineHeight: 1.25, letterSpacing: '-0.02em' }}>
+              프로젝트를 알려주세요.
+            </h1>
+            <p className="mt-4 text-[14px] lg:text-[15px] text-black/55" style={fontKr}>
+              필요한 내용을 남겨주시면 담당자가 확인 후 빠르게 연락드리겠습니다.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="pb-[120px] lg:pb-[160px]">
+            <div className="border-t-2 border-black pt-3 flex items-center justify-end gap-1.5">
+              <span className="text-[12px] text-black/45" style={fontKr}>필수 입력 사항</span>
+              <RequiredDot />
+            </div>
+
+            {/* 01 — 플랜 선택 (single select) */}
+            <div className="mt-[56px] lg:mt-[72px]">
+              <div className="flex items-baseline flex-wrap gap-2 mb-5 lg:mb-7">
+                <h2 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                  01. 원하는 플랜을 선택해주세요.
+                </h2>
+                <RequiredDot />
+                <span className="text-[12px] text-black/40" style={fontKr}>(하나만 선택 가능)</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {INQUIRY_PLANS.map(p => (
+                  <label key={p.id}
+                    className="cursor-pointer text-center px-4 py-5 border text-[14px] font-medium transition-colors"
+                    style={{
+                      ...fontKr,
+                      borderColor: plan === p.id ? '#1A1A1A' : 'rgba(0,0,0,0.16)',
+                      background: plan === p.id ? '#1A1A1A' : '#FFFFFF',
+                      color: plan === p.id ? '#FFFFFF' : '#1A1A1A',
+                    }}
+                  >
+                    <input type="radio" name="plan" value={p.id} required
+                      checked={plan === p.id} onChange={() => setPlan(p.id)} className="sr-only" />
+                    {p.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 02 — 프로젝트 정보 */}
+            <div className="mt-[56px] lg:mt-[72px]">
+              <h2 className="text-black mb-5 lg:mb-7" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                02. 프로젝트 정보를 입력해주세요.
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                <div>
+                  <label className={labelCls} style={fontKr}>제작 수량<RequiredDot /></label>
+                  <input type="text" required value={quantity} onChange={e => setQuantity(e.target.value)}
+                    placeholder="제작 수량을 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>사용예정일<RequiredDot /></label>
+                  <select required value={deadline} onChange={e => setDeadline(e.target.value)} className={inputCls} style={fontKr}>
+                    <option value="" disabled>사용예정일을 선택해주세요.</option>
+                    {DEADLINE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>프로젝트 예산<RequiredDot /></label>
+                  <select required value={budget} onChange={e => setBudget(e.target.value)} className={inputCls} style={fontKr}>
+                    <option value="" disabled>프로젝트 예산을 선택해주세요.</option>
+                    {BUDGET_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-black mb-2" style={fontKr}>첨부파일</label>
+                  <div className="flex items-stretch">
+                    <div className="flex-1 min-w-0 bg-black/[0.035] px-4 py-3 text-[14px] text-black/35 truncate" style={fontKr}>
+                      {fileName || '파일을 선택해주세요.'}
+                    </div>
+                    <button type="button" onClick={() => fileInputRef.current?.click()}
+                      className="shrink-0 px-5 text-[13px] font-semibold text-white bg-[#1A1A1A] hover:opacity-90 transition-opacity" style={fontKr}>
+                      파일업로드
+                    </button>
+                    <input ref={fileInputRef} type="file" className="hidden"
+                      onChange={e => setFileName(e.target.files?.[0]?.name ?? '')} />
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={labelCls} style={fontKr}>상세 문의내용<RequiredDot /></label>
+                  <textarea required value={detail} onChange={e => setDetail(e.target.value)}
+                    placeholder="상세 문의 내용을 입력해주세요." rows={6}
+                    className={`${inputCls} resize-none`} style={fontKr} />
+                </div>
+              </div>
+            </div>
+
+            {/* 03 — 기본정보 (기존 reference 의 04 프로젝트 상세 타입 accordion은 만들지 않고 바로 privacy/submit 로 이어진다) */}
+            <div className="mt-[56px] lg:mt-[72px]">
+              <h2 className="text-black mb-5 lg:mb-7" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                03. 기본정보를 입력해주세요.
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                <div>
+                  <label className={labelCls} style={fontKr}>회사명<RequiredDot /></label>
+                  <input type="text" required value={company} onChange={e => setCompany(e.target.value)}
+                    placeholder="회사명을 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>담당자명<RequiredDot /></label>
+                  <input type="text" required value={contactName} onChange={e => setContactName(e.target.value)}
+                    placeholder="담당자명을 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>연락처<RequiredDot /></label>
+                  <input type="tel" required value={phone} onChange={e => setPhone(e.target.value)}
+                    placeholder="연락처를 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>이메일<RequiredDot /></label>
+                  <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="이메일주소를 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+                <div>
+                  <label className={labelCls} style={fontKr}>유입경로<RequiredDot /></label>
+                  <select required value={referral} onChange={e => setReferral(e.target.value)} className={inputCls} style={fontKr}>
+                    <option value="" disabled>유입경로를 선택해주세요.</option>
+                    {REFERRAL_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-black mb-2" style={fontKr}>웹사이트</label>
+                  <input type="text" value={website} onChange={e => setWebsite(e.target.value)}
+                    placeholder="웹사이트를 입력해주세요." className={inputCls} style={fontKr} />
+                </div>
+              </div>
+            </div>
+
+            {/* privacy + submit */}
+            <div className="mt-[56px] lg:mt-[72px] pt-8 border-t border-black/10">
+              <label className="flex items-center gap-2.5 text-[13px] text-black" style={fontKr}>
+                <input type="checkbox" required checked={agreed} onChange={e => setAgreed(e.target.checked)}
+                  className="w-4 h-4 accent-black" />
+                개인정보처리방침에 동의합니다.
+                <button type="button" onClick={() => setShowPrivacy(v => !v)}
+                  className="underline underline-offset-2 text-black/60 hover:text-black transition-colors">
+                  내용보기
+                </button>
+              </label>
+              {showPrivacy && (
+                <p className="mt-3 max-w-[720px] text-[12px] leading-[1.8] text-black/50" style={fontKr}>
+                  {/* TODO: 실제 개인정보처리방침 전문/페이지로 교체 필요 — 현재는 임시 안내문 */}
+                  문의 답변을 위해 위에 입력하신 회사명·담당자명·연락처·이메일 등 정보를 수집·이용합니다.
+                  수집한 정보는 문의 응대 목적으로만 사용하며, 처리 완료 후 파기합니다.
+                </p>
+              )}
+
+              <div className="mt-8 flex flex-col items-center gap-3">
+                <button type="submit"
+                  className="inline-flex items-center gap-2.5 border border-black px-10 py-4 text-[15px] font-bold text-black hover:bg-black hover:text-white transition-colors"
+                  style={fontKr}>
+                  프로젝트 의뢰하기 <span aria-hidden>→</span>
+                </button>
+                {devNotice && (
+                  <p className="text-[12px] text-black/45" style={fontKr}>
+                    입력하신 내용 확인했습니다. 실제 접수 연동(이메일 전송 등)은 아직 준비 중입니다.
+                  </p>
+                )}
+              </div>
+            </div>
+          </form>
         </div>
       </section>
     </div>
@@ -2853,13 +3275,21 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
 export default function App() {
   const [view, setView] = useState<AppView>('landing')
   const [sels] = useState<Sels>({ ...DEFAULT_SELS })
-  // 라우터 라이브러리 없이 pathname 만으로 '/' ↔ '/portfolio' 를 전환한다(§AGENTS: 최소 구조).
-  const [route, setRoute] = useState(() => (window.location.pathname === '/portfolio' ? '/portfolio' : '/'))
+  // 라우터 라이브러리 없이 pathname 만으로 '/' ↔ '/portfolio' ↔ '/portfolio/:idx' ↔ '/inquiry' 를
+  // 전환한다(§AGENTS: 최소 구조). '/portfolio/:idx' 는 pathname 그대로를 route 로 사용하고
+  // App() 렌더링에서 정규식으로 idx 를 다시 뽑아낸다(별도 라우팅 라이브러리 설치 없음).
+  function pathToRoute(pathname: string) {
+    if (pathname === '/portfolio') return '/portfolio'
+    if (/^\/portfolio\/\d+$/.test(pathname)) return pathname
+    if (pathname === '/inquiry') return '/inquiry'
+    return '/'
+  }
+  const [route, setRoute] = useState(() => pathToRoute(window.location.pathname))
   // 다른 라우트로 이동하면서 도착 후 특정 섹션으로 스크롤해야 하는 경우(예: /portfolio → '/' → estimator)를 위한 예약값.
   const pendingScrollRef = useRef<string | null>(null)
 
   useEffect(() => {
-    function onPopState() { setRoute(window.location.pathname === '/portfolio' ? '/portfolio' : '/') }
+    function onPopState() { setRoute(pathToRoute(window.location.pathname)) }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
@@ -2884,6 +3314,17 @@ export default function App() {
 
   if (route === '/portfolio') {
     return <PortfolioPage navigate={navigate} />
+  }
+
+  {
+    const detailMatch = route.match(/^\/portfolio\/(\d+)$/)
+    if (detailMatch) {
+      return <PortfolioDetailPage idx={Number(detailMatch[1])} navigate={navigate} />
+    }
+  }
+
+  if (route === '/inquiry') {
+    return <InquiryPage navigate={navigate} />
   }
 
   if (view === 'consult') {

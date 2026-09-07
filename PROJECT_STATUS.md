@@ -1,21 +1,26 @@
 # PROJECT_STATUS.md
 
-> 최종 갱신: 2026-09-03 (V2 리디자인 진행 중)
+> 최종 갱신: 2026-09-07 (V2 리디자인 진행 중 — Landing rhythm 재조정 + `/portfolio` 실 데이터 이식 + `/portfolio/:idx` 상세 페이지 + asset 최적화 파이프라인, §25~§27)
 > 이 문서는 새 세션에서 작업을 이어가기 위한 현재 상태 스냅샷이다.
 > **코드가 이 문서와 다르면 코드가 정답이다.** 수정 후 이 문서도 갱신할 것.
-> 기준 파일: `src/App.tsx` (단일 파일, 약 2,485줄) · `src/index.css` · 현재 branch `v2-redesign`.
+> 기준 파일: `src/App.tsx` (단일 파일, 약 3,350줄) · `src/index.css` · `src/data/calendarPortfolio.ts`(자동 생성) · 현재 branch `v2-redesign`.
 
 ---
 
 ## 0. V1 → V2 무엇이 바뀌었나 (요약)
 
-- **섹션 순서**: `Header → Hero → Portfolio → Estimator → Clients → FAQ` (아래 §3)
+- **섹션 순서**: `Header → Hero → Portfolio → Estimator → Clients → FAQ` (아래 §3). Landing 밖에는 `/portfolio`
+  (실제 Touchgraphic Calendar 17개, §26) · `/portfolio/:idx`(상세, §26) · `/inquiry`(§24) 라우트가 있다
 - **Service 섹션 제거** — 컴포넌트 정의는 파일에 남아있으나 렌더하지 않음
 - **Contact 섹션 제거** — 마찬가지로 정의만 남고 미렌더. 하단 마무리는 FAQ 가 이어받음
 - **FAQ 가 사이트 마지막 섹션** — full-width **black** 배경, 흰 텍스트, 4문항. 구 Contact 의 몰입/마무리 역할 대체
-- **Portfolio** — 구 4:5 세로 썸네일 세트 → **가로형(4:3) 원본 제작사진 1장 + 아래 텍스트(카테고리/업체명/한 줄 설명)** editorial 카드. "정지 → 카드 1장 slide → 정지" 스텝 모션 + 무한 루프
+- **Portfolio(Landing 캐러셀)** — 구 4:5 세로 썸네일 세트 → **가로형(4:3) 원본 제작사진 1장 + 아래 텍스트(카테고리/업체명/한 줄 설명)** editorial 카드. "정지 → 카드 1장 slide → 정지" 스텝 모션 + 무한 루프. **임시 대표 7개** — 실제 17개는 `/portfolio`(§26)에 별도로 있음
 - **Estimator** — 제목 `달력 견적 계산기`. 제작 등급 표시명 `베이직 (실속형)` / `커스텀 (맞춤형)` / `하이앤드 (기획형)`. 공통 단계 `01 제작 등급 → 02 사이즈 → 03 내지 레이아웃`. **작가 협업(addon) 옵션 완전 제거**. 하단 CTA `이 견적으로 상담 신청하기 →` 1개
-- **배포**: V1 공개본(Netlify + 아임웹)은 **그대로 유지**. V2 는 아직 미배포이며, **의사결정권자 검토용으로 별도 Netlify 사이트에 배포 예정**
+- **Landing rhythm 2차 조정(§25)** — Hero headline line-height 1.3→1.14, Hero↔Portfolio·Portfolio↔Estimator spacing 축소, FAQ 내부 밀도 강화. 문구/데이터/가격 로직 무변경
+- **Git/배포**: V2는 이미 `a92ada6`(V2 포트폴리오·클라이언트·견적 UI 업데이트)까지 GitHub `origin/v2-redesign`
+  으로 push 완료됐고, 의사결정권자 검토용 Netlify 사이트(`gleaming-naiad-0686ac.netlify.app`)도 이미
+  존재한다. **오늘(2026-09-07) 진행한 §24~§27 작업분은 그 이후의 미커밋 working tree 변경사항**이라
+  아직 새 commit·push·재배포 전이다(§16·§17). V1 공개본(Netlify + 아임웹)은 그대로 유지 중
 
 ---
 
@@ -82,7 +87,7 @@ view === 'consult':
 - `#portfolio` → OK (`Portfolio`)
 - `#estimator` → OK (`EstimatorSection`)
 - `#faq` → OK (`FaqSection`)
-- `#contact` → **대상 섹션 없음** (Contact 제거됨). Header 의 `빠른상담`(데스크톱) / `제작 문의`(모바일) 버튼이 여기를 가리켜 **현재 스크롤이 동작하지 않음** — 미해결
+- `#contact` → **대상 섹션 없음** (Contact 제거됨). Header 의 `제작 문의`(모바일 전용) 버튼이 여기를 가리켜 **현재 스크롤이 동작하지 않음** — 미해결. 데스크톱 `상담 문의` 버튼은 2026-09-07 `/inquiry` 로 연결 완료(§24)
 - `#service`, `#about` → 대상 섹션 없음 (단, Header nav 에는 이 항목들이 이미 빠져 있음)
 
 ---
@@ -145,7 +150,7 @@ view === 'consult':
 ### hover (`.pf-card`, index.css)
 
 - hover-capable 기기만: `transform: scale(1.03) translateY(-2px)`, `box-shadow: 0 12px 28px rgba(0,0,0,0.12)`, `z-index: 10`, enter ~300ms / leave ~220ms
-  - (이전 값 `scale(1.06) translateY(-3px)` + `0 14px 32px/0.14` 에서 축소 조정됨 — 현재 `src/index.css` 미커밋 변경분)
+  - (이전 값 `scale(1.06) translateY(-3px)` + `0 14px 32px/0.14` 에서 축소 조정됨 — `a92ada6` 커밋에 포함된 값)
 - width/height/margin 불변 → 옆 카드 안 밀림, caption scale 안 함
 - `prefers-reduced-motion: reduce` → hover transform/shadow 없음
 
@@ -322,6 +327,12 @@ view === 'consult':
 
 ## 21. Portfolio 전체보기 페이지 (`/portfolio`) — 2026-09-05 신설
 
+> **⚠️ 2026-09-07 업데이트**: 아래 §21-21-3 에 설명된 "임시 7개(Landing과 동일 `PORTFOLIO` 데이터
+> 재사용)" 구조는 §26 에서 **실제 Touchgraphic Calendar 17개**로 완전히 교체됐다. 이 섹션(§21)은
+> wide breakout/4-column/hover 등 **디자인 구조가 여전히 유효**하므로 히스토리로 남겨두지만, "데이터"에
+> 관한 서술(7개, `PORTFOLIO`, `filterType` 등)은 전부 최신 상태가 아니다 — 데이터/라우팅(`/portfolio/:idx`
+> 상세 포함)은 반드시 §26 을 source of truth로 본다.
+
 - 라우터 라이브러리 없이 `App()` 이 `window.location.pathname` 을 `route` state 로 들고 있다가
   `/portfolio` 면 `PortfolioPage`, 그 외엔 기존 landing/consult 트리를 렌더(`src/App.tsx` `App()`).
   `navigate(path, { scrollTo? })` 함수가 `history.pushState` + `setRoute` + (필요 시) 도착 후
@@ -388,6 +399,47 @@ view === 'consult':
 - **localhost 검수 완료**(Claude in Chrome): Header `제작 사례` → `/portfolio` 이동, hero/필터 확인, `기업`/`기관`/`전체` 필터 정상 전환,
   전체 7개 항목 끝까지 스크롤 확인, `/portfolio` 직접 URL 진입 정상, portfolio → `견적 계산하기` → `/` 이동 후 estimator 스크롤 정상,
   landing `포트폴리오 전체보기` → `/portfolio` 이동 정상
+
+### 21-3. LEFT INFO + RIGHT IMAGE editorial → 원본 터치어그래픽 hover gallery 재해석 (2026-09-05, 최신)
+
+- 사용자가 기존 터치어그래픽 Portfolio(`touchagraphic.com/portfolio`)의 실제 hover 동작을 프레임 단위로
+  검토한 뒤, §21-2 의 "1 project = 1 큰 section(좌 info / 우 이미지)" 구조를 통째로 폐기하고 원본
+  갤러리의 interaction 언어(검정 타일 + hover 시 accent color panel 이 bottom→top 으로 슬라이드)를
+  V2 사례 수(7개)에 맞게 2열로 재해석하기로 결정. Hero/필터 영역은 이번에도 그대로 유지
+  - (참고: 이 작업 전 영상 파일(`references/portfolio-motion/touchagraphic-portfolio-reference.webm`)을
+    이 세션에서 직접 재생/ffmpeg 프레임 추출을 시도했으나 둘 다 실패 — ffmpeg 미설치, Chrome 자동화
+    환경에서 `<video>` 가 소스를 아예 fetch 하지 않아 재생 불가. 결국 사용자가 별도로(ChatGPT 쪽에서)
+    프레임 분석한 결과를 텍스트 명세로 전달받아 그것을 source of truth 로 구현)
+- **grid**: `grid-cols-1 lg:grid-cols-2`, gap 은 모바일 `gap-y-8`(일반 여백) / desktop `lg:gap-[1px]` +
+  `lg:bg-black/15`(카드 사이 1px 틈으로 divider color 가 비치는 "검정 보드" 효과 — 카드 자체가
+  edge-to-edge 라 grid 배경색이 hairline 처럼 보임). 홀수 마지막 항목(`세종스포츠정형외과`)은 CSS grid
+  auto-placement 로 자동으로 왼쪽 칸만 차지(별도 코드 불필요)
+- **card**: `aspect-ratio: 16/10`, `bg-black`, radius/border/shadow 없음. 이미지는 `absolute inset-0
+  object-cover` + 기존 `objectPosition`/`mediaScale` 그대로 재사용(`PORTFOLIO` 데이터 자체는 무변경)
+- **hover panel**(desktop 전용, `hidden lg:flex` + `lg:group-hover:translate-y-0`): 기본
+  `translate-y-full`(카드 아래로 완전히 숨음) → hover 시 `translate-y-0`. `transition-transform
+  duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]`(요청 240~300ms 범위 중간값), `motion-reduce:
+  transition-none` 으로 reduced-motion 대응. 패널 배경은 `rgba(accent, 0.9)`(완전 불투명 아님 — 이미지가
+  은은하게 비침, blur 없음)
+  - **accent**: `PORTFOLIO` 배열은 손대지 않고 `PF_ACCENTS = ['#16B8E6'(cyan), '#ECA900'(mustard),
+    '#F50076'(magenta), '#2A2A2A'(charcoal)]` 를 별도로 두고 원본 index 로 순환 배정(`index %
+    PF_ACCENTS.length`) — filter 로 보이는 순서가 바뀌어도 항목별 accent 는 고정
+  - **overlay text**: title(white, semibold, `clamp(20px,1.8vw,27px)`) → 작은 decorative `+`(white/50)
+    → `category · description`(white/80, 13px), 전부 중앙 정렬. 긴 설명 새로 작성하지 않고 기존
+    `item.description` 그대로 사용
+- **mobile**(`lg:hidden`): hover 없음 — 이미지 타일 아래에 category + title 만 기본 텍스트로 노출
+  (overlay 패널은 `hidden lg:flex` 라 모바일 DOM 에 아예 안 그려짐 → tap 오작동 위험 없음)
+- **hero→grid 간격**: 새 gallery 섹션 `pt-[64px] lg:pt-[88px]`(§21-2 의 좌우 2단 giant section 구조를
+  제거하면서 기존 spacing 로직도 함께 정리)
+- **localhost 검수**(Claude in Chrome, 실제 마우스 hover 테스트): 대한상공회의소(cyan) hover → 패널이
+  아래→위로 슬라이드, 이미지(말+캘린더 텍스트)가 패널 뒤로 은은하게 비침, `+` 표시 확인 → mouse leave 시
+  아래로 슬라이드 아웃(중간 프레임 캡처로 확인) → 아이디어두잇(mustard) hover 로 다른 accent 확인 →
+  동아쏘시오그룹(charcoal, index 3) hover 로 4번째 accent 확인 → row2/row3 스크롤, 마지막 항목이 왼쪽
+  칸만 차지하는 것 확인 → `기관` 필터 클릭 시 기관 3개만 남아 2열로 정상 reflow(전환 순간 이미지 잠깐
+  깜빡였다가 바로 로드 — lazy loading 특성, 문제 아님) → `전체` 복귀 확인. 모바일은 이번에도
+  `resize_window` 도구가 세션에서 응답하지 않아 실측은 스킵(코드는 `lg:hidden`/`hidden lg:flex` 로 모바일
+  분기 처리, 고정 폭 없음)
+- `npm run build` 성공
   - 모바일 뷰포트 실측은 이번 세션에서 `resize_window` 도구가 응답하지 않아(브라우저 창이 리사이즈되지 않음) 스킵 —
     코드는 다른 섹션과 동일한 `SHELL`/`clamp()` 타이포/단일 컬럼 패턴만 사용해 가로 overflow 위험 요소 없음
 - `npm run build` 성공(오류 없음)
@@ -472,14 +524,237 @@ view === 'consult':
 
 ---
 
+## 24. `/inquiry` 문의 페이지 신설 + Header CTA 연결 (2026-09-07)
+
+- **Header CTA**: 데스크톱 우측 `빠른상담`(`#1E50E0`, `#contact` 대상 없어 클릭 무반응이던 버튼, §12-1)을
+  워딩만 `상담 문의`로 변경하고 `/inquiry`로 라우팅. 스타일/색/크기는 그대로.
+  `Header`의 `page` prop 타입에 `'inquiry'` 추가, `handleInquiryClick`(로고/nav 클릭과 동일 패턴:
+  이미 `/inquiry`면 상단 스크롤, 아니면 `navigate('/inquiry')`) 추가. **모바일 전용 `제작 문의` 버튼
+  (`scrollToContact` → `#contact`, 대상 없음)은 이번 범위가 아니라 그대로 둠** — 여전히 미해결(§12-1 갱신).
+- **라우팅**: `App()`의 `route` state를 `pathToRoute(pathname)` 헬퍼로 `'/' | '/portfolio' | '/inquiry'`
+  3갈래로 확장(§21의 `navigate`/`popstate` 로직 재사용, 새 로직 추가 없음). `public/_redirects`(SPA
+  fallback)가 이미 모든 경로를 커버해 `/inquiry` 직접 진입도 별도 설정 없이 동작.
+- **`InquiryPage` 컴포넌트**(`src/App.tsx`, `PortfolioPage` 바로 다음): 기존 Touchgraphic 문의 페이지
+  (`touchagraphic.com/page/inquiry.html`, Claude in Chrome으로 실측)의 layout/spacing/form architecture를
+  재현. V2 `Header`(`page="inquiry"`) 그대로 재사용, `SHELL` 안에 `max-w-[1200px] mx-auto`로 폭 절충.
+  - **intro**: eyebrow `Inquiry`(Portfolio 페이지와 동일한 Courier New 라벨 스타일) + 헤드라인
+    `프로젝트를 알려주세요.` + 안내 카피 1줄. reference의 감성 마케팅 카피("소장하고 싶은 심미적인
+    결과물을...")는 그대로 옮기지 않고 절제된 안내문으로 대체(AGENTS §9 — 새 감성 카피 임의 작성 금지
+    원칙에 따라 최소 문구만 새로 작성)
+  - **필수 표시**: 우측 상단 `필수 입력 사항` + `RequiredDot`(`#DB438F`, Estimator 마스트헤드 CMYK 도트에
+    이미 쓰인 magenta 재사용 — 새 색 추가 없음)
+  - **01. 원하는 플랜을 선택해주세요.** (하나만 선택 가능): 기존 reference의 다중 프로젝트 타입 버튼 대신
+    현재 Estimator `TIER_DATA`의 표시명 3개(`베이직 (실속형)` / `커스텀 (맞춤형)` / `하이앤드 (기획형)`)를
+    그대로 재사용(새 카피 없음). `type="radio" name="plan" required` + `sr-only`로 네이티브 single-select·
+    필수 검증 확보, 시각은 rectangular box(선택 시 `#1A1A1A` 배경/흰 글자, reference와 동일 톤).
+    **Estimator(`EstimatorInline`)의 가격 데이터·계산 로직은 전혀 참조/변경하지 않음** — 이름 문자열만 재사용
+  - **02. 프로젝트 정보를 입력해주세요.**: `프로젝트명` 자리를 `제작 수량`(text, placeholder만) 으로 대체.
+    `사용예정일`은 기존 `DEADLINE_OPTS`, `프로젝트 예산`은 기존 `BUDGET_OPTS`(둘 다 `ConsultForm`에서도
+    쓰는 기존 옵션, 새 카피 없이 재사용)를 넣은 `<select>`. `첨부파일`은 숨김 `<input type="file">` +
+    `파일업로드` 버튼(선택한 파일명만 표시, 업로드 전송 없음). `상세 문의내용`은 `<textarea rows={6}>`
+  - **03. 기본정보를 입력해주세요.**: `회사명* / 담당자명* / 연락처* / 이메일* / 유입경로* / 웹사이트`
+    2-column. `유입경로` 옵션(`REFERRAL_OPTS`)은 기존에 없어 새로 추가(검색/SNS/지인·업체 소개/기존 고객/기타)
+  - **04(기존 reference의 accordion) 없음**: 03 다음 바로 privacy + submit — 요청대로 만들지 않음
+  - **privacy + submit**: `개인정보처리방침에 동의합니다.` 체크박스(`required`) + `내용보기` 토글(임시
+    안내문 노출, `TODO` 주석으로 실제 정책 전문 필요 표시) + outline 화살표 버튼 `프로젝트 의뢰하기 →`
+    (reference의 아이콘+사각 outline 버튼을 사이트 기존 화살표 모티프로 재해석)
+  - **submit 동작 — 백엔드 없음, fake success 없음**: `handleSubmit`은 `e.preventDefault()` 후
+    `console.log('[InquiryPage] submit — 백엔드 미연결...', {...formState})` 만 수행하고, 화면에는
+    `입력하신 내용 확인했습니다. 실제 접수 연동(이메일 전송 등)은 아직 준비 중입니다.` 문구를 노출.
+    **`TODO` 주석으로 실제 접수 API/이메일 전송 연동 필요함을 명시. touchagraphic.com의 실제 backend
+    endpoint를 추측해서 연결하지 않았다.** required validation은 전부 네이티브 HTML5 속성(`required`)에
+    위임(커스텀 검증 로직 없음)
+  - **반응형**: `grid-cols-1 sm:grid-cols-2`(02·03 필드), `grid-cols-1 sm:grid-cols-3`(01 플랜 박스).
+    고정 px 폭 없이 `max-w-[1200px]`/`flex-1 min-w-0`/`truncate` 위주라 가로 overflow 위험 요소 없음
+- **localhost 검수**(Claude in Chrome, 실제 reference와 나란히 비교): Header `상담 문의` 클릭 → `/inquiry`
+  이동, intro/01/02/03/privacy/submit 전체 구조가 reference와 유사한 밀도로 확인, 01에서 플랜 3개 중
+  하나 클릭 시 다른 선택 자동 해제(단일 선택) 확인, 02에 `프로젝트명` 없고 `제작 수량` 있음 확인, 03 기본정보
+  정상, 04 없음 확인, 빈 폼 제출 시 네이티브 required validation으로 첫 미입력 필드까지 스크롤됨 확인,
+  전체 필드 채운 뒤 제출 → 콘솔에 `[InquiryPage] submit` 로그 + 화면에 "준비 중" 안내문 노출(가짜 성공
+  없음) 확인, `/portfolio` 재방문해 기존 화면 영향 없음 확인. **모바일 실측은 이번에도 `resize_window`
+  도구가 이 세션에서 실제 뷰포트를 바꾸지 못해(§21 이후 반복된 동일 제약) 스크린샷으로 확인하지 못했고,
+  고정 폭 요소가 없는 코드 리뷰로 overflow 위험 없음만 확인함**
+- `npm run build` 성공
+- **다음 필요 작업(§19 참고)**: 실제 문의 접수 backend(이메일 전송/스프레드시트/CRM 등) 연동, 개인정보처리방침
+  전문 확정, 모바일 실기기 검수, Header 모바일 `제작 문의` 버튼(`#contact`, 대상 없음)도 `/inquiry`로
+  연결할지 여부 결정
+
+---
+
+## 25. Landing visual refinement — rhythm/typography 2차 조정 (2026-09-07)
+
+§21 이후 "잘 만든 섹션을 이어 붙인 느낌"이라는 피드백에 따라 Hero/Portfolio/Estimator/FAQ 사이의
+vertical rhythm과 Hero 내부 typography를 다시 조정. **문구·가격·계산 로직·데이터는 변경 없음**,
+spacing/line-height/일부 width 구조만 조정.
+
+### Hero (`function Hero`, `src/App.tsx`)
+- headline(`기업 / 기관` / `달력 제작 회사`) `line-height`: **1.3 → 1.14** (Noto Sans KR 특유의 느슨한
+  내부 leading을 압축해 "단단하고 응집력 있게"), `fontSize` clamp 상한: **66px → 80px**(wide desktop
+  존재감 강화)
+- Hero 하단 padding: **`pb-[44px] lg:pb-[80px]` → `pb-[36px] lg:pb-[56px]`**(Hero→Portfolio 전환을
+  더 빠르게 이어지도록 축소, Portfolio 쪽 조정과 함께 적용)
+- **`u-content-max`(신규 CSS class, `index.css`, `max-width:1600px`, margin 없이 우측만 캡)**: wide
+  desktop(1600px+)에서 좌측 headline과 우측 supporting copy(`전문 디자이너가` / `기획부터 — 제작까지
+  함께합니다`) 사이 gutter가 실측 **1199px**까지 벌어져 두 블록이 "떠 있는" 것처럼 보이던 문제를 해결.
+  적용 후 gutter **168px**로 축소, Hero badge+headline+우측 copy 전체를 이 클래스로 감쌈(좌측 시작선은
+  `.u-shell` 그대로 유지 — margin-inline 없음)
+- 이 gutter 문제는 Hero에만 적용(Portfolio 제목 행의 화살표/전체보기 컨트롤, FAQ 아코디언의 +/− 아이콘은
+  "보조 유틸리티"라 넓은 여백이 정상 패턴으로 판단 — `u-content-max` 미적용, 의도적 결정)
+
+### Portfolio → Hero/Estimator 전환 (`function Portfolio`)
+- section padding: **`pt-[52px] pb-[76px] md:pb-[96px] lg:pt-[124px] lg:pb-[160px]`
+  → `pt-[44px] pb-[64px] md:pb-[84px] lg:pt-[92px] lg:pb-[132px]`**
+- 데스크톱 합산 간격: Hero→Portfolio **204px → 148px**(빠르게 이어짐), Portfolio→Estimator
+  (Portfolio `pb-132` + Estimator `u-section-sm` 상단 clamp 최대 96) **≈256px → ≈228px**로,
+  Hero→Portfolio(148px)보다는 여전히 크게 유지해 "큰 시각 콘텐츠 뒤에는 한 번 더 숨쉬기" 위계 보존
+- Estimator(`EstimatorInline` 마스트헤드) 내부는 이미 조밀해 이번에 변경하지 않음(가격 로직 인접 코드라
+  리스크 최소화 목적도 있음)
+
+### FAQ (`function FaqSection`, `FaqRow`)
+- section 상단 padding: **`pt-[80px] lg:pt-[140px]` → `pt-[64px] lg:pt-[112px]`**(하단 `pb-[100px]
+  lg:pb-[160px]`은 페이지 종료 무게감 유지 위해 그대로)
+- heading → 첫 질문: **`mt-9 lg:mt-12` → `mt-8 lg:mt-10`**
+- 각 질문 row: **`py-6 lg:py-7` → `py-5 lg:py-6`**, 답변 하단 padding **`pb-6 lg:pb-7` → `pb-5 lg:pb-6`**
+- CTA(`터치 본 홈페이지 바로가기 →`): **`mt-10 lg:mt-14` → `mt-8 lg:mt-12`**
+- copyright: **`mt-10 lg:mt-14` → `mt-8 lg:mt-10`**
+- 목표: 질문·CTA·copyright가 하나의 조밀한 "마무리 블록"으로 보이게(question row 높이 축소로 밀도 ↑)
+
+### localhost 검수
+- media-palette.co.kr(REFERENCE)과 실측 비교(getBoundingClientRect/computedStyle) 후 적용, 적용 후
+  재확인: Hero headline이 눈에 띄게 단단해짐, Hero→"제작 사례" 전환이 즉시 이어지는 느낌, FAQ 질문/CTA/
+  copyright가 하나의 조밀한 마무리 블록으로 보임 확인. 가로 스크롤/overflow 없음(px 조정 + `u-content-max`
+  뿐, 새 고정폭 요소 없음)
+- `npm run build` 성공
+
+---
+
+## 26. `/portfolio` 실제 데이터 이식 + 상세 페이지(`/portfolio/:idx`) 신설 (2026-09-07)
+
+§21 의 임시 7개(Landing과 동일한 `PORTFOLIO` 재사용)를 걷어내고, 기존 Touchgraphic Calendar
+Portfolio(`touchagraphic.com/portfolio/pf.html?part_idx=21`)의 **실제 17개 프로젝트**로 교체하고
+프로젝트 클릭 시 실제 상세 이미지를 보여주는 `/portfolio/:idx` 페이지를 신설했다.
+**Landing의 `Portfolio`(가로 캐러셀, 임시 7개 `PORTFOLIO` 데이터)는 이번에도 전혀 건드리지 않음** —
+Landing = 대표 7개, `/portfolio` = 실제 17개 전부, 로 완전히 분리된 상태.
+
+### Production data
+- **`src/data/calendarPortfolio.ts`**(자동 생성 파일 — 상단에 "수정하지 말 것" 주석) — `CALENDAR_PORTFOLIO`
+  (17개 project 배열) + `getCalendarProjectByIdx(idx)` export
+  - source: `references/touch-portfolio-source/manifest.json`(title/company/category/date) +
+    `references/touch-portfolio-original/manifest-web.json`(webPath/width/height)를 order 기준 병합
+  - 생성 스크립트: `references/touch-portfolio-source/generate-data-file.mjs`(1회성, 재실행 가능)
+  - **17 project 전부, detail image 186장 전부** 포함(생성 시 개수 불일치 시 throw 하도록 만들어둠)
+  - `category` 필드는 원본 사이트의 실제 필터값(Editorial/Graphic/Calendar)이며 **"기업/기관" 분류가
+    아니다** — 원본에 기업/기관 metadata가 없어 임의로 만들지 않음(§12 참고)
+- 이미지 경로는 전부 `/portfolio/calendar/...` (public web asset, §27) — runtime에서
+  `references/touch-portfolio-original/`(425MB 원본) 참조 없음
+
+### `/portfolio` 목록 페이지 (`function PortfolioPage`)
+- Hero(`PORTFOLIO` eyebrow + `달력으로 완성한 브랜드의 장면들.`), 4열(desktop)/2열(tablet)/1열(mobile)
+  wide wall 구조, black tile, `object-fit:contain`, hover bottom→top 패널, `.u-gallery-wide` 폭 —
+  **전부 §21-3 이후 구조 그대로 유지**, 타일 콘텐츠만 `CALENDAR_PORTFOLIO`(17개)로 교체
+  - `PORTFOLIO_FILTERS`(전체/기업/기관) 버튼 UI는 그대로 두되, 원본에 기업/기관 분류가 없어 **filter
+    로직을 실질적으로 비활성화**(항상 17개 전부 노출) — 파괴적 UI 변경 금지 + 콘텐츠 정확성 우선 원칙에 따른
+    임시 조치, 분류 데이터가 정해지면 `filter` 조건을 다시 연결해야 함(§12)
+  - 각 타일 전체가 `<button onClick={() => navigate(`/portfolio/${item.idx}`)}>`로 클릭 가능
+  - hover/모바일 캡션 텍스트: `title` + (`company` ?? `category`)만 사용, 없는 description 임의 작성 안 함
+
+### 상세 페이지 (`function PortfolioDetailPage`, route `/portfolio/:idx`)
+- **routing**: `App()`의 `pathToRoute()`에 `/^\/portfolio\/\d+$/` 패턴 추가(새 라우팅 라이브러리 없음,
+  기존 pushState/popstate 방식 그대로 확장). 잘못된 idx(`/portfolio/999999`)는 크래시 없이 "프로젝트를
+  찾을 수 없습니다 + ‹ 목록으로" 표시(리다이렉트 아님, 정적 안내)
+  - `Header`의 `page` prop에 `'portfolio-detail'` 추가(로고/nav 클릭 시 `'portfolio'`가 아닌 경로이므로
+    자동으로 `navigate('/')` / `navigate('/portfolio')`로 떨어짐 — 별도 분기 로직 추가 불필요)
+- **body 구성**: 원본 detail page(idx 1878/974/827 3개 실측) 핵심만 이식 — 검은 배경 위 이미지가
+  edge-to-edge full-bleed로 순서대로 쌓이는 구조(hairline divider, crop/stretch 없음, `width:100%
+  height:auto`), 상단에 `‹ 목록으로` + `category · date` + title + company(있으면). **원본의 세로 텍스트
+  사이드바(About/Works/Contact 등 global nav 포함)는 그대로 복제하지 않고** V2 Header + 가로형 정보
+  블록으로 재해석(반응형·작업 시간 고려한 의도적 단순화 — 필요시 나중에 더 정교화 가능)
+  - 이미지 wrapper: `.u-gallery-wide`(Portfolio 목록과 동일한 wide breakout 축 재사용, 새 width 시스템
+    추가 없음)
+- **이전/다음/목록 navigation**: `CALENDAR_PORTFOLIO`의 `order` 기준으로 계산. 첫 프로젝트(order 1,
+  idx 1878)는 "이전" 없음, 마지막(order 17, idx 827)은 "다음" 없음 — 둘 다 확인됨. 텍스트 링크 수준(새
+  카드/CTA 없음)
+- **image loading**: 프로젝트당 처음 2장만 `loading="eager"`, 나머지 `lazy`. 네트워크 로그로 확인:
+  목록 페이지는 17 thumbnail만 요청, 상세 페이지는 선택된 프로젝트의 eager 2장만 초기 요청되고 다른
+  프로젝트의 이미지는 전혀 요청되지 않음(§17 성능 요구사항 충족)
+- **scroll-to-top 버그와 수정**: `App()`의 `navigate()`가 쓰는 legacy 2-인자 `window.scrollTo(0,0)`이
+  전역 CSS `scroll-behavior: smooth`(`index.css` `html`)를 따르는 애니메이션 스크롤이라, 상세→상세
+  이동(예: idx 1878 뒤로 매우 긴 스크롤 상태에서 idx 1870으로 "다음" 클릭) 시 React가 옛 DOM을
+  치환하면서 스크롤 애니메이션이 중간에 끊겨 `scrollY`가 이전 위치(9000px+)에 그대로 남는 문제 발견.
+  `PortfolioDetailPage`에 `useEffect(() => window.scrollTo({top:0,left:0,behavior:'auto'}), [idx])`
+  추가해 해결(옵션 객체의 `behavior:'auto'`는 CSS smooth-scroll을 무시하고 즉시 이동 — 공유
+  `navigate()` 함수 자체는 다른 페이지 영향 없도록 건드리지 않음, `PortfolioDetailPage` 국소 수정)
+- **browser back/forward 테스트**: 목록→클릭→상세(direct)/뒤로→목록/앞으로→상세/직접 URL 진입
+  (`/portfolio/827`) 전부 정상 확인
+
+### localhost 검수 (Claude in Chrome, touchagraphic.com과 실측 비교)
+- `/portfolio` 첫 4개 순서·thumbnail·title이 원본과 정확히 일치 확인(썸네일 안의 "AI" 배지는 원본
+  이미지 파일 자체에 포함된 것이라 그대로 재현됨도 확인 — UI에서 새로 추가한 것 아님)
+- 상세 4개 테스트: order1(idx1878, 10장) / order2(idx1870, 12장, prev/next) / order13(idx974, 23장,
+  touchagraphic.com+creativedoit.com 혼합 호스트+gif+png 포함) / order17(idx827, 3장, 가장 오래된
+  creativedoit.com 전용 프로젝트) — 전부 이미지 개수·순서 정상
+- Landing(`/`) Hero/캐러셀/Estimator(견적 계산 정상, 900,000원 표시 확인), `/inquiry` 회귀 테스트 정상
+- `npm run build` 성공, `dist/portfolio/calendar/`에 203개 webp 정상 복사 확인
+
+---
+
+## 27. Touchgraphic Calendar Portfolio — 원본 확보 + 웹 최적화 asset 파이프라인 (2026-09-07)
+
+§26 의 production data가 참조하는 실제 asset을 만든 작업. **원본 파일도, 실제 application code도
+이번 파이프라인 자체에서는 수정하지 않음** — 전부 `references/` 아래 1회성 스크립트로 처리.
+
+### 1) Source 조사 — `references/touch-portfolio-source/`
+- `manifest.json` — touchagraphic.com에서 Claude in Chrome으로 직접 DOM 분석해 수집한 17개 프로젝트
+  원본 메타(order/idx/title/category/company/date/description/thumbnailUrl/detailUrl/detailImages
+  원본 URL). **source of truth** — 이 파일은 이후 어떤 단계에서도 덮어쓰지 않음
+- `SOURCE_REPORT.md` — 조사 과정 요약
+- 결과: 17 project, thumbnail 17개, detail image 186개, 전부 URL 확보 성공(막힌 곳 없음)
+
+### 2) 원본 다운로드 — `references/touch-portfolio-original/` (**약 426MB, runtime 사용 금지**)
+- `download-assets.mjs`(Node, 1회성) 로 203개(썸네일 17 + 상세 186) 전부 다운로드
+- 폴더 구조: `NNN-slug/`(예 `001-donga-diary/`) 안에 `thumbnail.<ext>` + `01.<ext>`…`NN.<ext>`,
+  원본 파일명/확장자(.jpg/.JPG/.gif/.png 등) 그대로 보존, resize/압축/포맷변환 없음
+- `manifest-local.json` — 각 asset의 원본 URL ↔ local path 매핑(§26 데이터 생성의 입력 중 하나)
+- 검증: 203/203 다운로드 성공, 실패 0, 중복 URL 0(`download-summary.json`)
+
+### 3) 웹 최적화 — `public/portfolio/calendar/` (**약 22MB, 실제 웹에서 쓰는 유일한 경로**)
+- `optimize-assets.mjs`(Node + `sharp`, 1회성) 로 203개 전부 WebP 변환
+  - **quality 84**(80/84/88 실측 비교 후 결정 — 캘린더 그리드 미세 숫자/한글/얇은 선/그라데이션 등
+    6종 크롭 확대 비교에서 세 값 사이 육안 차이 없음 확인, 안전마진 있는 84 선택)
+  - **thumbnail max-width 1200px**, **detail max-width 2000px**(2200px도 테스트했으나 초소형
+    인쇄용 라벨 텍스트 개선폭이 미미해 2000px 유지 — 실제 날짜 숫자/월 라벨은 2000px에서 이미 선명)
+  - upscale 없음(원본이 target보다 작으면 원본 크기 그대로), crop/stretch 없음, aspect ratio 유지,
+    auto-rotate(EXIF) 적용
+  - `sharp`는 `npm install sharp --no-save --no-package-lock`로 **임시 설치**(package.json/lock
+    파일 변경 없음 — `git status`로 확인됨). node_modules는 gitignore 대상이라 그대로 둬도 안전
+- `manifest-web.json`(`references/touch-portfolio-original/` 안) — 각 asset의 원본 local path ↔
+  `/portfolio/calendar/...` webPath + width/height 매핑(§26 데이터 생성의 또 다른 입력)
+- 검증(자체 + 독립 스크립트 `validate-optimized.mjs` 이중 확인): **203/203 valid**, 0 failed,
+  WebP magic bytes/upscale 없음/aspect ratio 일치 전부 통과
+- 용량: 원본 약 425,982,539 bytes(426MB) → 최적화 23,030,622 bytes(약 22MB), **감소율 94.8%**
+- 육안 검수: 밝은 배경/어두운 스튜디오 사진/작은 한글+이모지/GIF·PNG 소스/일러스트 그라데이션 등 6종
+  실제 파일을 원본과 확대 비교, 밴딩·블록 아티팩트·텍스트 뭉개짐 없음 확인
+
+### 파일 경로 요약
+| 경로 | 용량 | 용도 |
+|------|------|------|
+| `references/touch-portfolio-source/manifest.json` | - | 원본 메타데이터 source of truth |
+| `references/touch-portfolio-original/` | ≈426MB | 원본 archive, **runtime 사용 금지** |
+| `references/touch-portfolio-original/manifest-local.json` | - | 원본 URL↔local path |
+| `references/touch-portfolio-original/manifest-web.json` | - | local path↔webPath+크기 |
+| `public/portfolio/calendar/` | ≈22MB | **실제 웹에서 쓰는 유일한 asset 경로** |
+| `src/data/calendarPortfolio.ts` | - | application이 실제로 import하는 production data |
+
+---
+
 ## 12. 아직 해결해야 할 문제
 
 | # | 위치 | 문제 |
 |---|------|------|
-| 1 | Header | `빠른상담`(데스크톱) / `제작 문의`(모바일) 버튼이 `#contact` 를 가리키나 대상 섹션 없음 → 클릭 시 스크롤 안 됨 |
-| 2 | Header | `빠른상담` 배경 `#1E50E0` 임시색, `회사소개서` 버튼 `href="#"` 미연결 |
+| 1 | Header | ~~`빠른상담`(데스크톱) 버튼이 `#contact` 를 가리키나 대상 섹션 없음~~ → 2026-09-07 해결(§24). `제작 문의`(모바일 전용) 버튼은 여전히 `#contact` 를 가리켜 클릭 시 스크롤 안 됨 — 미해결 |
+| 2 | Header | `상담 문의`(구 `빠른상담`) 배경 `#1E50E0` 임시색 — 브랜드색 확정 후 교체 필요 |
 | 3 | Portfolio | ~~`포트폴리오 전체보기 ›` 링크 미연결~~ → 2026-09-05 해결. `/portfolio` 전체보기 페이지 신설(§21) |
-| 4 | Portfolio | 7개 대표컷 최종 선정·`objectPosition`·`mediaScale` 미확정 (후보 비교 중) |
+| 4 | Portfolio | ~~7개 대표컷 최종 선정 미확정~~ → 2026-09-07 해결. `/portfolio`는 실제 17개 전부로 교체됨(§26). Landing 캐러셀의 임시 7개(`PORTFOLIO`, `objectPosition`/`mediaScale`)는 여전히 별개로 남아있고 미변경 |
 | 5 | Clients | ~~실제 로고 이미지 없음~~ → 2026-09-05 해결. 실제 12개 클라이언트 로고 wall 로 교체(§22) |
 | 6 | consult 뷰 | `sels` 가 항상 빈 값 → 요약 6개가 전부 `—`. 폼 실제 전송 없음 |
 | 7 | 전역 | Service / Contact / Consultation / 구 FAQ / Footer / EstimatorPage 등 미렌더 레거시 다량 잔존 — 정리 여지(요청 시에만) |
@@ -487,6 +762,11 @@ view === 'consult':
 | 9 | 빌드 | 미사용 이미지(구 4:5 png 세트 등)가 `void` 참조로 번들에 포함 — 용량 과다(§15) |
 | 10 | SEO | `.figma/make/site.json` `robots.index: false` → 빌드 결과 `noindex` + `robots.txt Disallow: /`. `<title>` 기본값, description 영문 자동 생성, GA 미설정 |
 | 11 | 구조 | 색상·폰트 인라인 하드코딩 산재 — 토큰화 여지(요청 시에만) |
+| 12 | `/portfolio` | **기업/기관 filter 분류 미확정** — 원본 Touchgraphic에 기업/기관 metadata가 없어(category는 Editorial/Graphic/Calendar만 존재) filter 버튼 UI는 있지만 실제로는 항상 전체 17개 노출. 17개 각각을 기업/기관으로 분류할 기준을 사용자가 정해야 `PortfolioPage`의 filter 조건을 다시 연결할 수 있음(§26) |
+| 13 | `/portfolio/:idx` | 상세 페이지 상단 정보 블록은 원본의 세로 텍스트 사이드바를 그대로 복제하지 않고 V2 톤 가로 블록으로 재해석함(§26) — 필요하면 더 원본에 가깝게 다듬는 디자인 디테일 검수 여지 있음 |
+| 14 | `/inquiry` | 실제 문의 접수 backend(이메일 전송/스프레드시트/CRM 등) 미연결 — 현재는 `console.log` + "준비 중" 안내만 표시(§24) |
+| 15 | 전역 | 모바일 실기기 검수 미실시 — 이번 세션들에서 Claude in Chrome의 `resize_window` 도구가 실제 뷰포트를 바꾸지 못해 코드 리뷰(고정 폭 요소 없음)로만 안전성 확인, 실기기/실제 좁은 뷰포트 스크린샷 검증은 아직 없음 |
+| 16 | Git | `references/touch-portfolio-original/`(≈426MB) · `references/touch-portfolio-source/`(≈46MB, quality-test 크롭 포함) · `public/portfolio/calendar/`(≈22MB) 가 전부 untracked 상태 — 무엇을 커밋할지 결정 필요(§16 참고) |
 
 ---
 
@@ -534,27 +814,46 @@ view === 'consult':
 
 ## 15. 현재 `npm run build` 상태
 
-- **성공** (2026-09-03 확인). `vite v8.x` → `✓ built in ~1.2s`. 빌드 오류 없음
-- 산출물: `dist/assets/index-*.js` ≈ 238KB (gzip 74.5KB), `index-*.css` ≈ 44KB (gzip 8.5KB), `dist/index.html`, `dist/robots.txt`
+- **성공** (2026-09-07 최종 재확인, §25/§26/§27 반영 후). `vite v8.x` → `✓ built in ~1.2s`. 빌드 오류 없음
+- 산출물: `dist/assets/index-*.js` ≈ 296KB (gzip 92.6KB), `index-*.css` ≈ 50KB (gzip 9.5KB), `dist/index.html`, `dist/robots.txt`, `dist/portfolio/calendar/`(203개 webp, `public/`에서 그대로 복사됨, 확인 완료)
 - `npm run build` 는 `tsc` 타입 체크를 돌리지 않으므로, 타입 오류가 있어도 빌드는 통과할 수 있음
 - 경고성 사실(오류 아님):
-  - **이미지 용량 과다** — 레거시 `EXHIBITIONS` 가 파일 끝 `void EXHIBITIONS` 로 참조돼 있어, rail 에 안 쓰는 `pf01~pf15` 대형 png 까지 전부 번들에 포함. 최대: `일러스트_한국수목정원관리원.png` ≈10.4MB, `기업_설빙.png` ≈10.3MB, `기업_동아제약.png` ≈9.6MB. rail 실제 사용분은 원본 사진 8장(7 카드 + 1 secondary)
+  - **이미지 용량 과다** — 레거시 `EXHIBITIONS` 가 파일 끝 `void EXHIBITIONS` 로 참조돼 있어, rail 에 안 쓰는 `pf01~pf15` 대형 png 까지 전부 번들에 포함. 최대: `일러스트_한국수목정원관리원.png` ≈10.4MB, `기업_설빙.png` ≈10.3MB, `기업_동아제약.png` ≈9.6MB. rail 실제 사용분은 원본 사진 8장(7 카드 + 1 secondary). **`/portfolio` 실제 17개 asset(§26/§27)은 이 문제와 무관** — `public/portfolio/calendar/`는 Vite 모듈 번들이 아니라 static copy라 최적화된 22MB만 그대로 `dist/`로 복사됨
   - `dist/robots.txt` = `User-agent: *\nDisallow: /` (site.json `robots.index: false`). 공개 인덱싱 원하면 §12-10 참고
 
 ---
 
 ## 16. Git / branch 상태
 
-- 현재 branch: **`v2-redesign`**
-- 커밋: `7f9fae0 V1 회의 전 기준점` **1개뿐**. V2 작업 전체가 아직 **미커밋**
-  - `src/App.tsx` — modified (V2 리디자인 전반)
-  - `src/index.css` — modified (`.pf-card:hover` scale `1.06→1.03` + 그림자 축소, 단 1건)
-  - untracked: `night-portfolio.ps1`, `src/imports/portfolio-originals/`, `src/imports/portfolio-v2/`
-- 커밋 이력이 없어 "직전 세션에서 승인한 값" 인지 조정 중간값인지 git 으로 구분 불가 — 코드에 있는 값이 현재 상태다
+- 현재 branch: **`v2-redesign`** (HEAD, `origin/v2-redesign` 을 tracking)
+- **GitHub remote**: `origin` = `https://github.com/Taesaje/touchagraphic-calendar-v2.git`
+- **commit 이력**(`git log --oneline --decorate`, 2026-09-07 확인, 오래된 것부터):
+  1. `7f9fae0` `V1 회의 전 기준점` — tag `v1-pre-meeting`, `main`/`origin/main` 이 가리키는 커밋(V1 기준점, `main` 은 이미 `origin/main` 으로 push 완료)
+  2. `2da8448` `V2 의사결정권자 검토본 1차`
+  3. `a92ada6` `V2 포트폴리오·클라이언트·견적 UI 업데이트` — **`v2-redesign` 의 현재 HEAD, 이미 `origin/v2-redesign` 으로 push 완료**(tracking branch 설정됨)
+- **즉 "V2 작업이 전부 미커밋"이라는 이전 서술은 틀렸다.** `a92ada6` 까지는 이미 GitHub에 push된 상태다.
+  **미커밋인 것은 `a92ada6` 이후, 오늘(2026-09-07) 세션들에서 진행한 작업분뿐이다**:
+  Landing rhythm 재조정(§25) · `/portfolio` 실 데이터 이식·상세 페이지(§26) · asset 확보/최적화
+  파이프라인(§27) · `/inquiry`(§24, 이 커밋 이전 작업일 가능성도 있으나 working tree 기준으로는 현재
+  미커밋 변경분에 포함) — 이 working tree 변경사항은 아직 새 commit 으로 만들어지지 않았다
+- 현재 `git status --short`(오늘 작업 시작 시점 기준):
+  - `M PROJECT_STATUS.md` / `M src/App.tsx`(§24~§26 반영분 포함) / `M src/index.css`(§25 `u-content-max` 등 포함)
+  - untracked: `night-portfolio.ps1`, `src/data/`(§26, `calendarPortfolio.ts`), `public/portfolio/`(§27, ≈22MB, **웹 asset — 커밋 후보**), `references/touch-portfolio-original/`(§27, **≈426MB — 절대 커밋 금지**), `references/touch-portfolio-source/`(§27, ≈46MB, 조사/스크립트/quality-test 크롭 — 대부분 archive 성격, 커밋 여부 판단 필요)
+- 커밋 메시지만으로는 `a92ada6` 시점에 정확히 어디까지 반영됐는지(예: `.pf-card:hover` scale 값 등 세부
+  조정 하나하나) 완전히 구분하기 어려운 부분이 있을 수 있음 — 다만 **commit 자체와 GitHub push 여부는
+  위 3개 커밋 + 두 브랜치 모두 확정된 사실**이다
+- **⚠️ 다음 세션에서 커밋할 때 반드시 주의**:
+  - **`git add .` / `git add -A` 사용 금지 권고** — `references/touch-portfolio-original/`(426MB)이 함께 staging될 위험이 매우 큼. 파일을 개별 지정해서 add 할 것
+  - `references/touch-portfolio-original/` 은 archive 원본이라 **repo에 커밋하지 않는 것을 권장**(용량 문제) — 필요하면 `.gitignore` 추가를 사용자에게 먼저 확인
+  - `public/portfolio/calendar/`(22MB, 실제 웹 asset)는 정상적인 커밋 후보이지만 저장소 용량이 커지므로 커밋 여부는 사용자 판단 필요
+  - `night-portfolio.ps1` — 용도 불명 untracked 스크립트, 이번에도 그대로 두고 건드리지 않음(§AGENTS: 낯선 파일 임의 삭제 금지)
+  - 오늘 작업분을 커밋하면 `a92ada6` 이후의 **새 commit**이 되어야 한다(기존 커밋을 amend하지 않는다).
+    커밋 후 `origin/v2-redesign` 으로 push 할지, 그리고 §17 의 V2 검토용 Netlify 사이트에 재배포할지는
+    반드시 사용자 지시를 받은 뒤 진행한다
 
 ---
 
-## 17. 배포 상태 — V1 공개본 유지, V2 미배포
+## 17. 배포 상태 — V1 공개본 유지, V2 검토용 사이트 이미 존재(오늘 작업분 재배포 전)
 
 ### V1 (현재 공개본 — 그대로 유지, 건드리지 않음)
 - Netlify 운영본: `https://dancing-twilight-d43fb2.netlify.app/`
@@ -562,9 +861,14 @@ view === 'consult':
 - 개인(커스텀) 도메인은 아직 미연결
 
 ### V2 (현재 branch `v2-redesign`)
-- **아직 어디에도 배포하지 않음**
-- 계획: **의사결정권자 검토용으로 별도 Netlify 사이트에 배포 예정** (기존 V1 운영 URL·아임웹 게시본은 그대로 두고, 검토용 링크만 별도 생성)
-- 배포 시점·사이트 이름·URL 은 사용자가 명시적으로 지시한 뒤 진행한다. 그 전까지 Netlify 배포·공개본 업데이트 작업 금지
+- **의사결정권자 검토용 Netlify 사이트가 이미 존재한다**: `https://gleaming-naiad-0686ac.netlify.app/`
+  (V1 운영 URL·아임웹 게시본과는 완전히 별개, V1은 그대로 유지)
+- **2026-09-07 이전 작업분(commit `a92ada6` 기준)까지가 이 사이트에 배포된 상태로 추정된다.**
+  오늘(2026-09-07) 세션들에서 진행한 Landing rhythm 재조정(§25) · `/portfolio` 실 데이터 이식·상세
+  페이지(§26) · asset 최적화(§27) · `/inquiry`(§24) 등은 전부 **아직 이 커밋 이후의 미커밋 working
+  tree 변경사항**이라 **아직 이 Netlify 사이트에 재배포되지 않았다**(§16 참고)
+- 재배포(및 그 전 단계인 새 commit/push)는 사용자가 명시적으로 지시한 뒤 진행한다. 그 전까지 Netlify
+  재배포·공개본 업데이트 작업 금지
 
 ---
 
@@ -583,18 +887,38 @@ npm run preview  # 빌드 결과 미리보기
 
 ## 19. 다음 작업 후보
 
-1. **V2 검토용 Netlify 별도 배포** — 새 사이트 생성 → 최신 `dist` 배포 → 검토 링크 공유 (V1 은 불변)
-2. **Header 앵커 정리** — `빠른상담` / `제작 문의` 목적지 재설정(estimator 로 보낼지, contact 재도입할지 결정), `회사소개서` 링크 또는 항목 처리, `#1E50E0` 브랜드색 확정
-3. **Portfolio 대표컷 확정** — 7개 카드 최종 이미지 선정, `objectPosition` / `mediaScale` 미세조정 마무리, `전체보기 ›` 링크 처리
-4. **Clients 실제 로고/명단** — 텍스트 placeholder 를 실제 로고로, 안내 문구 제거
-5. **consult 뷰 정비** — 실제 폼 전송(메일/시트/스팸 방지), `sels` 연동 또는 요약 블록 제거
-6. **레거시 정리** — Service / Contact / Consultation / 구 FAQ / Footer / EstimatorPage / 미사용 이미지 import 제거로 번들 축소 (요청 시)
-7. **모바일 실기기 검수** — 가로 overflow / 잘림 / Portfolio 레일 터치 스크롤
-8. **공개 전 SEO / analytics** — `.figma/make/site.json` `robots.index` / `title` / `description`, GA ID
+1. **`/portfolio` 기업/기관 filter 분류 확정**(§12-12) — 17개 프로젝트를 기업/기관으로 분류할 기준을
+   사용자에게 받아 `PortfolioPage`의 filter 조건을 다시 연결. 원본 사이트에 metadata가 없어 지금은
+   filter 버튼이 시각적으로만 존재(항상 전체 17개 노출)
+2. **`/portfolio/:idx` 상세 디자인 디테일 검수**(§12-13) — 지금은 원본 detail page의 핵심(검은 배경
+   full-bleed 이미지 스택)만 이식하고 상단 정보 블록은 V2 톤으로 재해석한 상태. 원본과 더 가깝게
+   다듬을지, 지금 상태로 확정할지 결정
+3. **`/inquiry` backend 연결**(§12-14, §24) — 이메일 전송/스프레드시트/CRM 등 실제 접수 수단 확정 후
+   `InquiryPage`의 `handleSubmit` TODO 구현. 개인정보처리방침 전문도 아직 임시 안내문
+4. **모바일 실기기 검수**(§12-15) — 이번 세션들 전부 `resize_window` 도구가 실제 뷰포트를 바꾸지
+   못해 코드 리뷰로만 안전성 확인. 실제 좁은 화면/실기기에서 Hero·Portfolio wall·상세 이미지 스택·
+   Inquiry 폼·Estimator 전부 육안 검수 필요
+5. **Git 커밋 범위 정리 후 새 commit**(§16) — `references/touch-portfolio-original/`(426MB) 제외
+   여부(`.gitignore`), `public/portfolio/calendar/`(22MB) 커밋 여부, `references/touch-portfolio-source/`
+   (46MB, 조사 스크립트+quality-test 크롭) 커밋 여부를 사용자와 확정한 뒤, `a92ada6` 이후 오늘 작업분을
+   **새 commit**으로 만들고 `origin/v2-redesign` 으로 push
+6. **V2 검토용 Netlify 사이트 재배포**(§17) — 사이트는 이미 존재(`gleaming-naiad-0686ac.netlify.app`,
+   `a92ada6` 기준으로 추정), 위 새 commit/push 이후 최신 `dist` 를 그 사이트에 재배포 → 검토 링크 공유
+   (V1 은 불변). `/portfolio/:idx` 딥링크·SPA fallback(`public/_redirects`)이 배포 환경에서도 동작하는지
+   확인 필요
+7. **Header 앵커 정리** — 모바일 전용 `제작 문의` 버튼의 `#contact` 대상 없음 문제(데스크톱 `상담 문의`는
+   `/inquiry`로 이미 해결됨), `#1E50E0` 브랜드색 확정
+8. **Landing 캐러셀 대표 7개 재검토(선택)** — `/portfolio`가 실제 17개로 교체된 지금, Landing의 임시
+   7개(`PORTFOLIO`)도 실제 17개 중 대표 7개로 교체할지 여부는 별도 결정 필요(이번 세션들에서는 의도적으로
+   손대지 않음)
+9. **consult 뷰 정비** — 실제 폼 전송(메일/시트/스팸 방지), `sels` 연동 또는 요약 블록 제거
+10. **레거시 정리** — Service / Contact / Consultation / 구 FAQ / Footer / EstimatorPage / 미사용
+    이미지 import 제거로 번들 축소 (요청 시)
+11. **공개 전 SEO / analytics** — `.figma/make/site.json` `robots.index` / `title` / `description`, GA ID
 
 > 공통 원칙(AGENTS.md): 한 번에 한 섹션만, 수정 전 해당 코드 먼저 읽기, 기존 기능·상태·링크·데이터 임의 변경 금지,
 > 견적 계산기 가격·계산 로직 동결, 새 badge/eyebrow/gradient 임의 추가 금지, 모바일 반응형·가로 overflow 확인, 수정 후 `npm run build`,
-> 작업 완료 후 이 문서의 해당 항목 갱신.
+> 작업 완료 후 이 문서의 해당 항목 갱신. `references/touch-portfolio-original/` 은 runtime에서 절대 참조하지 않는다(§27).
 
 ---
 
@@ -603,25 +927,46 @@ npm run preview  # 빌드 결과 미리보기
 ```
 이 캘린더 랜딩페이지(V2)의 작업을 이어간다. branch 는 v2-redesign 이어야 한다.
 
-먼저 프로젝트 루트의 AGENTS.md 와 PROJECT_STATUS.md 를 읽고,
-src/App.tsx 의 App() 컴포넌트에서 실제 렌더 순서를 확인해라.
-현재 렌더 순서: Header → Hero → Portfolio → EstimatorSection → Clients → FaqSection.
-Service / Contact 섹션은 제거됐고(정의만 남고 void 처리), FAQ 가 마지막 black full-width 섹션이다.
+먼저 프로젝트 루트의 AGENTS.md 와 PROJECT_STATUS.md 를 처음부터 끝까지 읽어라(특히 §25~§27,
+§12, §16, §19 — 2026-09-07 에 추가된 최신 내용). 그 다음 src/App.tsx 의 App() 컴포넌트에서
+실제 라우팅/렌더 로직을 확인해라.
 
-현재 상태 요약:
-- Header / Hero / Portfolio(가로형 카드 + 스텝 모션) / Estimator(달력 견적 계산기, 3등급, addon 제거) /
-  Clients(placeholder) / FAQ(4문항, black) 로 구조·카피가 대체로 정리된 상태.
-- 빌드 성공. V1 공개본(Netlify + 아임웹)은 그대로 유지, V2 는 아직 미배포.
-- 미완성: Header #contact 앵커 깨짐, Portfolio 대표컷/전체보기 링크, Clients 로고,
-  consult 뷰 폼 전송, 레거시 컴포넌트 잔존, SEO(noindex/title/GA).
+현재 route 구조: '/' (Header→Hero→Portfolio→EstimatorSection→Clients→FaqSection),
+'/portfolio' (PortfolioPage, 실제 Touchgraphic Calendar 17개), '/portfolio/:idx'
+(PortfolioDetailPage, 상세 이미지 186개 중 선택된 프로젝트), '/inquiry' (InquiryPage).
+view==='consult' 이면 ConsultForm(레거시 상담 폼, 견적 계산기 CTA로 진입).
 
-이번 작업: 사용자가 지정하는 하나만 진행한다. (지정 없으면 먼저 무엇을 할지 물어라.)
+현재 상태 요약(2026-09-07 세션들 종료 시점):
+- Landing(Hero/Portfolio 캐러셀 7개/Estimator/Clients/FAQ)은 §25 에서 spacing/line-height 리듬만
+  재조정, 문구·데이터·가격 로직은 무변경.
+- `/portfolio`는 임시 7개(Landing과 동일 PORTFOLIO)에서 실제 Touchgraphic Calendar 17개로 완전히
+  교체됨(§26). 클릭하면 `/portfolio/:idx` 상세 페이지에서 실제 상세 이미지(총 186장)를 원본 순서
+  그대로 볼 수 있다. asset은 원본 아카이브(references/touch-portfolio-original/, 426MB, runtime
+  미사용) → 웹 최적화(public/portfolio/calendar/, 22MB, WebP quality 84) 2단계로 준비됐다(§27).
+  production data는 src/data/calendarPortfolio.ts(자동 생성, 직접 수정 금지).
+- `/inquiry`는 UI/폼 상태/validation까지 구현 완료, 실제 backend 미연결(§24).
+- 빌드 성공. **Git: `v2-redesign` 은 이미 `a92ada6` 커밋까지 `origin/v2-redesign` 으로 push 완료돼
+  있다. 오늘(§24~§27) 작업분만 그 이후의 미커밋 working tree 변경사항** — 새 commit·push 전(§16).
+  V2 검토용 Netlify 사이트(`gleaming-naiad-0686ac.netlify.app`)도 이미 존재하며, 오늘 작업분은 아직
+  거기 재배포되지 않았다(§17). V1 공개본(Netlify + 아임웹)은 그대로 유지.
+- 미완성(§12 전체 참고): `/portfolio` 기업/기관 filter 분류 미확정, 상세 페이지 디자인 디테일 검수,
+  Header 모바일 `제작 문의` #contact 앵커 깨짐, consult 뷰 폼 전송, 레거시 컴포넌트 잔존,
+  SEO(noindex/title/GA), 모바일 실기기 검수 전무.
+
+이번 작업: 사용자가 지정하는 하나만 진행한다. (지정 없으면 §19 다음 작업 후보를 보여주고 무엇을
+할지 물어라.)
 작업 규칙:
 - 지정된 한 섹션/한 종류의 문제만 수정한다. 다른 섹션·컴포넌트·레거시는 건드리지 않는다.
 - EstimatorInline 의 가격 데이터(TIER_DATA)와 계산 로직은 절대 수정하지 않는다. addon 을 다시 넣지 않는다.
+- src/data/calendarPortfolio.ts 는 자동 생성 파일이다 — 직접 손으로 편집하지 말고, 데이터를
+  바꿔야 하면 references/touch-portfolio-source/generate-data-file.mjs 를 다시 실행하거나
+  source manifest 자체를 먼저 검토한다.
+- references/touch-portfolio-original/ 은 runtime에서 참조하지 않는다. 웹은 무조건
+  public/portfolio/calendar/ 만 사용한다.
 - editorial / print-studio 톤, 타이포·여백 중심 레이아웃 유지. 새 badge/eyebrow/gradient/감성 카피 임의 추가 금지.
 - 데스크톱·모바일 반응형 모두 확인, 가로 overflow·잘림 없는지 확인.
 - 수정 후 npm run build 로 빌드 오류 확인.
+- git add . / git add -A 사용 금지 — 대용량 원본 폴더가 함께 staging될 수 있다. 파일을 개별 지정한다.
 - 작업 완료 후 PROJECT_STATUS.md 의 해당 항목을 갱신한다.
 
 먼저 대상 섹션의 현재 코드를 읽고, 바꿀 내용을 제안한 뒤 승인받고 수정에 들어가라.
