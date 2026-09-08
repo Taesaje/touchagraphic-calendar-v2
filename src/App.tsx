@@ -54,6 +54,12 @@ import clIdeadoitDoit  from '@/imports/client-logos/ideadoit-doit.png'
 import clSulbing       from '@/imports/client-logos/sulbing.png'
 import clDaeguOpera    from '@/imports/client-logos/daegu-opera.png'
 
+import certCalendar   from '@/imports/certifications/direct-production-calendar.jpg'
+import certIndustrial from '@/imports/certifications/industrial-design-company.png'
+import certWomenOwned from '@/imports/certifications/women-owned-business.jpg'
+import certPublishing from '@/imports/certifications/direct-production-publishing.jpg'
+import certDesignSvc  from '@/imports/certifications/direct-production-design-service.jpg'
+
 // ── 공통 레이아웃 셸 ─────────────────────────────────────────────────────────
 // index.css의 .u-shell / .u-rail-pad 로 정의 (fluid 좌우 padding + max-width 1920px).
 // 모든 일반 섹션이 이 셸을 공유해 좌측 시작선을 일치시킨다.
@@ -1788,6 +1794,70 @@ const CLIENTS: ClientLogo[] = [
   { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
 
+// ── CERTIFICATIONS ────────────────────────────────────────────────────────────
+// Clients 바로 위에 배치되는 신뢰/인증 섹션. ABBG(abbg.co.kr/service) 서비스 페이지의
+// "가운데 정렬 상단 텍스트 + 카드형 인증서 그리드" 배치만 참고하고, 모션·색은 넣지 않는다.
+// 인증서 원본이 세로형 실제 스캔본이라 카드 안 이미지는 object-contain으로 잘리지 않게 유지.
+type Certification = { src: string; label: string }
+const CERTIFICATIONS: Certification[] = [
+  { src: certCalendar,   label: '직접생산확인증명서' },
+  { src: certIndustrial, label: '산업디자인전문회사' },
+  { src: certWomenOwned, label: '여성기업확인서' },
+  { src: certPublishing, label: '출판물 직접생산' },
+  { src: certDesignSvc,  label: '디자인서비스 직접생산' },
+]
+
+function CertificationSection() {
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+  return (
+    <section className="bg-white u-section-sm">
+      <div className={SHELL}>
+        <div className="max-w-[640px] mx-auto text-center flex flex-col items-center gap-4">
+          <span
+            className="t-label uppercase text-black/55 inline-flex items-center gap-2"
+            style={fontKr}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-black/55" aria-hidden />
+            CERTIFIED
+          </span>
+          <h2
+            className="text-black"
+            style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(24px, 3.4vw, 42px)', lineHeight: 1.35, letterSpacing: '-0.025em' }}
+          >
+            신뢰할 수 있는 인증 기반으로
+            <br />
+            기업 맞춤 달력을 제작합니다
+          </h2>
+          <p className="t-body text-black/50 break-keep">
+            공공기관 및 기업 협업에 필요한 각종 인증과 확인서를 바탕으로
+            프로젝트 진행 과정의 신뢰성과 안정성을 함께 제공합니다.
+          </p>
+        </div>
+
+        <div className="mt-10 lg:mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-5">
+          {CERTIFICATIONS.map(c => (
+            <div
+              key={c.label}
+              className="rounded-[20px] border border-black/[0.06] bg-[#FAFAF7] p-4 lg:p-5 flex flex-col gap-3"
+              style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}
+            >
+              <div className="rounded-[10px] overflow-hidden bg-white border border-black/[0.06] aspect-[3/4] flex items-center justify-center">
+                <img
+                  src={c.src}
+                  alt={c.label}
+                  className="w-full h-full object-contain"
+                  loading="lazy"
+                />
+              </div>
+              <span className="t-caption text-black/60 text-center" style={fontKr}>{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function Clients() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
@@ -3337,6 +3407,7 @@ export default function App() {
       <Hero />
       <Portfolio navigate={navigate} />
       <EstimatorSection onConsult={() => setView('consult')} />
+      <CertificationSection />
       <Clients />
       <FaqSection />
     </div>

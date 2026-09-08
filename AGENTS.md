@@ -2,6 +2,35 @@
 
 React + Vite + Tailwind CSS project. It was scaffolded in Figma Make; ongoing work is done locally in Claude Code.
 
+## 세션 시작 시 필수 읽기
+
+이 프로젝트에서 작업을 시작하기 전에 반드시 다음 순서로 확인한다.
+
+1. `BUILDING_PROFILE.md`
+   - 사용자의 작업 방식
+   - 판단 기준
+   - Pain Point
+   - 도구 선택 원칙
+   - "방법이 아니라 목표에 최적화한다"는 최상위 원칙
+   을 확인한다.
+
+2. `PROJECT_NOW.md`
+   - 존재하는 경우 현재 작업 상태와 바로 다음 작업을 확인한다.
+
+3. `PROJECT_STATUS.md`
+   - 상세 이력이나 과거 결정이 필요한 경우 관련 섹션만 찾아 읽는다.
+   - 새 세션마다 전체 문서를 처음부터 끝까지 읽는 것을 기본값으로 하지 않는다.
+
+4. 실제 코드와 Git 상태
+   - 문서와 코드가 다르면 실제 코드/Git 상태가 source of truth다.
+
+사용자가 특정 도구나 방법을 요청하더라도,
+더 본질적이고 효율적인 방법이 있다면
+BUILDING_PROFILE.md의 원칙에 따라 먼저 제안한다.
+
+단 새로운 도구를 무분별하게 권하지 말고
+전환 비용과 장기 효율을 함께 판단한다.
+
 ## Development Server
 
 This project originated in Figma Make, but work now happens locally in Claude Code. **No dev server runs automatically here** — start one yourself only when you need to see the site in a browser.
