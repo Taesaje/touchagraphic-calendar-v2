@@ -1795,18 +1795,17 @@ const CLIENTS: ClientLogo[] = [
 ]
 
 // ── CERTIFICATIONS ────────────────────────────────────────────────────────────
-// Clients 바로 위에 배치되는 신뢰/인증 섹션. ABBG(abbg.co.kr/service) 서비스 페이지의
-// "가운데 정렬 상단 텍스트 + 카드형 인증서 그리드" 배치만 참고하고, 모션·색은 넣지 않는다.
-// 인증서 원본이 세로형 실제 스캔본이라 카드 안 이미지는 object-contain으로 잘리지 않게 유지.
-type Certification = { src: string; label: string }
-const CERTIFICATIONS: Certification[] = [
-  { src: certCalendar,   label: '직접생산확인증명서' },
-  { src: certIndustrial, label: '산업디자인전문회사' },
-  { src: certWomenOwned, label: '여성기업확인서' },
-  { src: certPublishing, label: '출판물 직접생산' },
-  { src: certDesignSvc,  label: '디자인서비스 직접생산' },
+// 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
+// 출판물은 원본의 대분류명이며, 뒷면에 있는 세부품명·유효기간은 여기서 추정하지 않는다.
+const CORE_CERTIFICATIONS = [
+  { src: certIndustrial, label: '산업디자인전문회사', scope: '(종합)', alt: '산업디자인전문회사 신고확인증 — 전문분야 종합', description: '시각·제품·포장디자인', note: '' },
+  { src: certWomenOwned, label: '여성기업확인서', scope: '', alt: '여성기업 확인서', description: '추정가격 5천만원 이하\n1인 견적 수의계약 가능 범위', note: '관련 법령 및 계약 조건에 따름' },
 ]
-
+const PRODUCTION_CERTIFICATIONS = [
+  { src: certCalendar, label: '달력' },
+  { src: certPublishing, label: '출판물' },
+  { src: certDesignSvc, label: '디자인서비스' },
+]
 function CertificationSection() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
@@ -1834,24 +1833,41 @@ function CertificationSection() {
           </p>
         </div>
 
-        <div className="mt-10 lg:mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-5">
-          {CERTIFICATIONS.map(c => (
-            <div
-              key={c.label}
-              className="rounded-[20px] border border-black/[0.06] bg-[#FAFAF7] p-4 lg:p-5 flex flex-col gap-3"
-              style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}
-            >
-              <div className="rounded-[10px] overflow-hidden bg-white border border-black/[0.06] aspect-[3/4] flex items-center justify-center">
-                <img
-                  src={c.src}
-                  alt={c.label}
-                  className="w-full h-full object-contain"
-                  loading="lazy"
-                />
-              </div>
-              <span className="t-caption text-black/60 text-center" style={fontKr}>{c.label}</span>
+        <div className="mt-10 lg:mt-14 grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-10" style={fontKr}>
+          <div className="min-w-0">
+            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">핵심 자격</h3>
+            <div className="grid grid-cols-2 gap-3 lg:gap-5">
+              {CORE_CERTIFICATIONS.map(c => (
+                <figure key={c.label} className="min-w-0">
+                  <div className="bg-[#FAFAF7] border border-black/[0.06] p-2 lg:p-4">
+                    <img src={c.src} alt={c.alt} className="w-full h-[180px] sm:h-[220px] lg:h-[260px] object-contain" loading="lazy" />
+                  </div>
+                  <figcaption className="mt-3">
+                    <h4 className="min-h-[48px] text-[15px] lg:text-[18px] leading-[1.5] font-bold text-black break-keep">
+                      {c.label}{c.scope && <span className="block">{c.scope}</span>}
+                    </h4>
+                    <p className="mt-2 text-[12px] lg:text-[13px] leading-[1.65] text-black/70 break-keep whitespace-pre-line">{c.description}</p>
+                    {c.note && <p className="mt-1 text-[11px] leading-[1.6] text-black/55 break-keep">{c.note}</p>}
+                  </figcaption>
+                </figure>
+              ))}
             </div>
-          ))}
+          </div>
+          <div className="min-w-0 border-t border-black/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
+            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">직접생산확인증명서</h3>
+            <div className="grid grid-cols-3 gap-3 lg:gap-5">
+              {PRODUCTION_CERTIFICATIONS.map((c, index) => (
+                <figure key={c.label} className="min-w-0">
+                  <div className="bg-[#FAFAF7] border border-black/[0.06] p-1 lg:p-4">
+                    <img src={c.src} alt={`직접생산확인증명서 (${c.label})`} className="w-full h-[128px] sm:h-[200px] lg:h-[260px] object-contain" loading="lazy" />
+                  </div>
+                  <figcaption className="mt-3">
+                    <h4 className={`${index === 0 ? 'font-bold text-black' : 'font-medium text-black/70'} text-[14px] lg:text-[18px] leading-[1.5] break-keep`}>{c.label}</h4>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
