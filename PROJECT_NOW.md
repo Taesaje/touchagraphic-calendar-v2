@@ -2,12 +2,14 @@
 
 > 이 문서는 히스토리가 아니라 "지금 상태"만 담는다. 업데이트할 때는 append하지 말고 덮어쓴다.
 > 상세 이력은 `PROJECT_STATUS.md`의 섹션 번호로만 연결한다.
+> commit SHA / working tree 상태는 빠르게 변하므로 이 문서에 고정하지 않는다.
+> 세션 시작 시 반드시 Git에서 직접 확인한다.
 
 ## 1. 현재 기준점
 
 - 날짜: 2026-09-08
 - branch: `v2-redesign` (origin에 tracking됨)
-- latest commit: `b7795cf` "V2 작업 반영 (자동 publish) - 2026-09-08 01:40"
+- latest commit: 세션 시작 시 `git log -1 --oneline`으로 실제 Git에서 확인 (이 문서에 SHA를 고정하지 않음 — 실제 Git이 source of truth)
 - GitHub remote: `https://github.com/Taesaje/touchagraphic-calendar-v2.git`
 - V2 검토용 Netlify URL: `https://gleaming-naiad-0686ac.netlify.app/` (origin/v2-redesign push 시 git 연동 자동 재배포 확인됨)
 - build 상태: `npm run build` 성공 (오류 없음, 최신 확인 기준)
