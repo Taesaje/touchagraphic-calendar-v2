@@ -31,6 +31,48 @@ BUILDING_PROFILE.md의 원칙에 따라 먼저 제안한다.
 단 새로운 도구를 무분별하게 권하지 말고
 전환 비용과 장기 효율을 함께 판단한다.
 
+## PROJECT_NOW 유지 규칙
+
+`PROJECT_NOW.md`는 현재 상태만 담는 문서다.
+
+실제 기능/디자인/구조/배포 상태가 바뀌는 작업을 완료했을 때는
+작업 종료 전에 `PROJECT_NOW.md`도 현재 상태에 맞게 갱신한다.
+
+사용자가 매번 별도로
+"PROJECT_NOW를 업데이트해라"
+라고 요청할 필요가 없어야 한다.
+
+단 다음 원칙을 지킨다.
+
+1. 과거 작업 이력을 append하지 않는다.
+   항상 현재 상태로 덮어쓴다.
+
+2. commit SHA, modified/untracked 파일 목록처럼
+   빠르게 변하는 Git 상태를 PROJECT_NOW.md에 고정하지 않는다.
+   이런 정보는 세션 시작 시 실제 Git에서 확인한다.
+
+3. 완료되지 않은 작업은
+   완료된 것처럼 기록하지 않는다.
+
+4. 실제 화면 검수가 필요한 디자인 작업은
+   코드 작성/build 성공만으로 "완료" 처리하지 않는다.
+
+5. PROJECT_NOW.md는 짧게 유지한다.
+   상세 히스토리는 PROJECT_STATUS.md에 남긴다.
+
+6. 작업의 결과가 현재 프로젝트 상태를 바꾸지 않는 경우
+   PROJECT_NOW.md를 억지로 수정하지 않는다.
+
+예:
+- 단순 조사
+- 질문 답변
+- 임시 테스트
+- 실패한 실험
+- 코드 변경 없는 진단
+
+7. `npm run publish:v2`로 작업을 종료하기 전에는
+   PROJECT_NOW.md가 현재 실제 상태와 맞는지 확인한다.
+
 ## Development Server
 
 This project originated in Figma Make, but work now happens locally in Claude Code. **No dev server runs automatically here** — start one yourself only when you need to see the site in a browser.

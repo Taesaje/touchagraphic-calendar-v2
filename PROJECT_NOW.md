@@ -40,27 +40,19 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
 - Clients — 실제 로고 asset 그리드
 - `/inquiry` 문의 페이지 UI (§24)
 - Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포, 실측 확인 완료)
-- `npm run publish:v2` — build → safe staging → commit → push 자동화, 실제 1회 실행해 정상 동작 검증 완료(commit `b7795cf`)
-- 인증/직접생산 신뢰 섹션(`CertificationSection`) — 코드 구현 및 build 통과까지 완료, 아직 commit 전(§14)
+- `npm run publish:v2` — build → safe staging → commit → push 자동화, 실제 여러 차례 실행해 정상 동작 검증 완료
+- 인증/직접생산 신뢰 섹션(`CertificationSection`) — 구현 완료, build 성공, GitHub commit·push 완료, Netlify Git 연동 자동배포 완료, 기존 V2 URL(`gleaming-naiad-0686ac.netlify.app`)에서 인증서 카드 5장 정상 표시 확인 완료
+- `AGENTS.md` / `BUILDING_PROFILE.md` / `PROJECT_NOW.md` — 모두 GitHub에 commit·push 반영 완료
 
-## 4. 현재 진행 중인 작업 (git status 기준)
+## 4. 현재 진행 중인 작업
 
-- `AGENTS.md` (수정, 미커밋) — "세션 시작 시 필수 읽기" 규칙 추가 — **완료**
-- `src/App.tsx` (수정, 미커밋) — `CertificationSection` 신규 섹션 추가(Clients 위) — **검수 필요** (build는 통과했으나 실제 브라우저 화면 확인은 아직 안 됨)
-- `BUILDING_PROFILE.md` (신규, untracked) — 작업 방식/판단 기준 문서 — **완료**
-- `PROJECT_NOW.md` (신규, untracked) — 이 문서 — **완료**
-- `src/imports/certifications/` (신규, untracked) — 인증서 이미지 5장, `App.tsx`에서 import 중 — **완료**
-- `references/certifications/` (신규, untracked) — 인증서 원본 이미지 보관용, 코드에서 미참조 — **완료**
-- `night-portfolio.ps1` (untracked) — 사용자 개인 로컬 자동화 스크립트, 저장소 편입 여부 미결정 — **보류**
-- `public/portfolio/calendar/optimize-summary.json` (untracked) — 이미지 최적화 리포트, 사이트 콘텐츠 아님 — **보류**
+working tree 상태는 세션 시작 시 `git status --short`로 직접 확인한다.
+PROJECT_NOW.md에는 파일별 modified/untracked 상태를 저장하지 않는다.
 
 ## 5. 다음 우선순위
 
-1. `CertificationSection`을 실제 브라우저(localhost 또는 Netlify)에서 데스크톱/모바일 반응형까지 확인
-2. 확인 후 오늘 변경사항(`AGENTS.md`, `src/App.tsx`, `BUILDING_PROFILE.md`, `PROJECT_NOW.md`, `src/imports/certifications/`)을 `npm run publish:v2`로 commit·push
-3. `PROJECT_STATUS.md`에 인증 섹션 작업을 새 섹션 번호(§28)로 기록해 상세 이력 동기화
-4. Portfolio 랜딩 카드 최종 7개 선정 확정 여부 점검(§6, 미확정 상태로 남아있음)
-5. `night-portfolio.ps1` / `optimize-summary.json`을 저장소에 편입할지, 계속 untracked로 둘지 사용자 결정 필요
+1. `PROJECT_STATUS.md`에 인증 섹션(`CertificationSection`) 작업을 새 섹션 번호(§28)로 기록해 상세 이력 동기화
+2. Portfolio 랜딩 카드 최종 7개 선정 확정 여부 점검(§6, 미확정 상태로 남아있음)
 
 ## 6. 보호해야 하는 것
 
@@ -105,7 +97,7 @@ npm run dev
 npm run publish:v2
 ```
 
-`publish:v2`는 build → safe staging → commit → push까지 자동화되어 있고 실제 1회 실행해 정상 동작을 확인한 상태다(§4 참고).
+`publish:v2`는 build → safe staging → commit → push까지 자동화되어 있고 실제 여러 차례 실행해 정상 동작을 확인한 상태다(§3 참고).
 
 ## 9. Source of truth
 
