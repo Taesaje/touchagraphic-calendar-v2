@@ -11,3 +11,7 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
+
+# 대용량 원본 참고자료 (사이트 콘텐츠 아님, public/portfolio/calendar 로 이미 최적화 반출됨)
+references/touch-portfolio-original/
+references/touch-portfolio-source/
