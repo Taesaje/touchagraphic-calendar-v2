@@ -1811,31 +1811,33 @@ function CertificationSection() {
   return (
     <section className="bg-white u-section-sm">
       <div className={SHELL}>
-        <div className="max-w-[640px] mx-auto text-center flex flex-col items-center gap-4">
+        <div className="max-w-[680px] mx-auto text-center flex flex-col items-center gap-3">
           <span
-            className="t-label uppercase text-black/55 inline-flex items-center gap-2"
-            style={fontKr}
+            className="inline-flex items-center gap-2 rounded-full text-[11px] font-semibold text-black uppercase"
+            style={{ ...fontKr, border: '0.8px solid #1A1A1A', padding: '3px 12px', letterSpacing: '0.08em' }}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-black/55" aria-hidden />
+            <span className="flex gap-[3px]" aria-hidden>
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: '#4CACE9' }} />
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: '#DB438F' }} />
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: '#FDF251' }} />
+              <span className="w-[6px] h-[6px] rounded-full" style={{ background: '#1A1A1A' }} />
+            </span>
             CERTIFIED
           </span>
           <h2
-            className="text-black"
-            style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(24px, 3.4vw, 42px)', lineHeight: 1.35, letterSpacing: '-0.025em' }}
+            className="text-black lg:whitespace-nowrap break-keep"
+            style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(24px, 3.2vw, 40px)', lineHeight: 1.3, letterSpacing: '-0.025em' }}
           >
-            신뢰할 수 있는 인증 기반으로
-            <br />
-            기업 맞춤 달력을 제작합니다
+            검증된 자격으로 달력을 제작합니다
           </h2>
-          <p className="t-body text-black/50 break-keep">
-            공공기관 및 기업 협업에 필요한 각종 인증과 확인서를 바탕으로
-            프로젝트 진행 과정의 신뢰성과 안정성을 함께 제공합니다.
+          <p className="t-body text-black/55 lg:whitespace-nowrap break-keep">
+            공공기관과 기업 협업에 필요한 인증을 바탕으로 서비스를 제공합니다
           </p>
         </div>
 
-        <div className="mt-10 lg:mt-14 grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-10" style={fontKr}>
+        <div className="mt-8 lg:mt-12 grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-10" style={fontKr}>
           <div className="min-w-0">
-            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">핵심 자격</h3>
+            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">주요 인증 및 자격</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               {CORE_CERTIFICATIONS.map(c => (
                 <figure key={c.label} className="min-w-0">
@@ -1843,8 +1845,9 @@ function CertificationSection() {
                     <img src={c.src} alt={c.alt} className="w-full h-[180px] sm:h-[220px] lg:h-[260px] object-contain" loading="lazy" />
                   </div>
                   <figcaption className="mt-3">
-                    <h4 className="min-h-[48px] text-[15px] lg:text-[18px] leading-[1.5] font-bold text-black break-keep">
-                      {c.label}{c.scope && <span className="block">{c.scope}</span>}
+                    <h4 className="flex items-baseline gap-1 whitespace-nowrap overflow-hidden text-ellipsis text-[13.5px] lg:text-[18px] leading-[1.4] font-bold text-black tracking-[-0.01em]">
+                      <span>{c.label}</span>
+                      {c.scope && <span className="font-semibold text-black/50">{c.scope}</span>}
                     </h4>
                     <p className="mt-2 text-[12px] lg:text-[13px] leading-[1.65] text-black/70 break-keep whitespace-pre-line">{c.description}</p>
                     {c.note && <p className="mt-1 text-[11px] leading-[1.6] text-black/55 break-keep">{c.note}</p>}
@@ -1856,13 +1859,13 @@ function CertificationSection() {
           <div className="min-w-0 border-t border-black/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
             <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">직접생산확인증명서</h3>
             <div className="grid grid-cols-3 gap-3 lg:gap-5">
-              {PRODUCTION_CERTIFICATIONS.map((c, index) => (
+              {PRODUCTION_CERTIFICATIONS.map(c => (
                 <figure key={c.label} className="min-w-0">
                   <div className="bg-[#FAFAF7] border border-black/[0.06] p-1 lg:p-4">
                     <img src={c.src} alt={`직접생산확인증명서 (${c.label})`} className="w-full h-[128px] sm:h-[200px] lg:h-[260px] object-contain" loading="lazy" />
                   </div>
                   <figcaption className="mt-3">
-                    <h4 className={`${index === 0 ? 'font-bold text-black' : 'font-medium text-black/70'} text-[14px] lg:text-[18px] leading-[1.5] break-keep`}>{c.label}</h4>
+                    <h4 className="font-bold text-black text-[14px] lg:text-[18px] leading-[1.5] break-keep">{c.label}</h4>
                   </figcaption>
                 </figure>
               ))}
