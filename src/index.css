@@ -281,3 +281,19 @@ body {
   font-size: 12px;
   letter-spacing: 0.03em;
 }
+
+/* PortfolioPage(/portfolio) — Scroll Down 원형 텍스트 그래픽의 느린 무한 회전 */
+.pf-scroll-ring {
+  animation: pf-spin 9s linear infinite;
+  transform-origin: 50% 50%;
+}
+@keyframes pf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-scroll-ring {
+    animation: none;
+  }
+}

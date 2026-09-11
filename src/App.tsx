@@ -337,20 +337,19 @@ const RESULT_LABELS: Record<string, string> = {
 //   · lg 미만 → 로고 + '제작 문의' 최소 구조 (모바일 헤더는 새로 디자인하지 않음)
 // 좌우 시작선은 Hero(.u-shell)와 동일하게 맞춘다. 수치는 reference 1440px 화면 기준 근사값.
 const HEADER_NAV = [
-  { label: '제작 사례',     href: '#portfolio', targetId: 'portfolio-scroll-target' },
+  { label: '제작 사례 확인', href: '#portfolio', targetId: 'portfolio-scroll-target' },
   { label: '견적 계산하기', href: '#estimator', targetId: 'estimator-scroll-target' },
 ]
 
-// nav 클릭 시 target(섹션 제목 블록)이 viewport 세로 중앙에 오도록 스크롤.
-// fixed 헤더 때문에 scroll-margin-top 만으로는 중앙 정렬이 안 되므로 rect 로 직접 계산한다.
+// nav 클릭 시 target 이 고정 Header 아래 적절한 여백을 두고 화면 상단에 오도록 스크롤.
+// target 엘리먼트에 지정된 CSS scroll-margin-top(반응형 헤더 높이 반영)을 네이티브
+// scrollIntoView 가 그대로 존중하므로, 헤더 높이를 JS 에서 다시 계산하지 않아도 된다.
 // App 의 route 전환 후 pending scroll 처리에서도 재사용하기 위해 모듈 스코프로 둔다.
-function scrollToCenter(id: string) {
+function scrollToAnchor(id: string) {
   const target = document.getElementById(id)
   if (!target) return
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const rect = target.getBoundingClientRect()
-  const targetY = window.scrollY + rect.top - (window.innerHeight - rect.height) / 2
-  window.scrollTo({ top: Math.max(0, targetY), behavior: reduce ? 'auto' : 'smooth' })
+  target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
 }
 
 // page: 현재 어느 화면에서 렌더되는지('landing' | 'portfolio'). navigate: App 이 소유한 route 전환 함수.
@@ -384,7 +383,7 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
       return
     }
     // estimator
-    if (page === 'landing') { scrollToCenter(targetId); return }
+    if (page === 'landing') { scrollToAnchor(targetId); return }
     navigate('/', { scrollTo: targetId })
   }
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
@@ -442,7 +441,7 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
 function Hero() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
-    <section className="bg-white">
+    <section id="hero" className="bg-white">
       <div className={SHELL}>
         {/* 상단 pt = 고정 헤더 높이 + reference의 헤더→descriptor 간격.
             하단 pb: 2026-09-07 refinement — Hero→Portfolio 전환을 좀 더 빠르게 이어지도록 축소
@@ -835,7 +834,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
 
   return (
-    <section id="portfolio" className="bg-white pt-[44px] pb-[64px] md:pb-[84px] lg:pt-[92px] lg:pb-[132px]">
+    <section id="portfolio" className="bg-white pt-[44px] pb-[64px] md:pb-[84px] lg:pt-[92px] lg:pb-[132px] scroll-mt-16 lg:scroll-mt-24">
       {/* 헤더: 일반 content shell — 좌측 시작선이 첫 카드 시작선과 연결됨. 제목 ↔ 전체보기 같은 라인 */}
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
@@ -1443,7 +1442,7 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
   return (
     <div className="bg-white">
       {/* ── 마스트헤드 ── (브랜드: 큰 gothic 타이틀 + 옆에 얇은 라운드 라벨 + CMYK 도트) */}
-      <div id="estimator-scroll-target" className="border-b border-ink pb-6 mb-9">
+      <div id="estimator-scroll-target" className="border-b border-ink pb-6 mb-9 scroll-mt-[88px] lg:scroll-mt-[120px]">
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
           <div className="min-w-0">
             <span
@@ -1809,7 +1808,7 @@ const PRODUCTION_CERTIFICATIONS = [
 function CertificationSection() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
-    <section className="bg-white u-section-sm">
+    <section id="certification" className="bg-white u-section-sm scroll-mt-16 lg:scroll-mt-24">
       <div className={SHELL}>
         <div className="max-w-[680px] mx-auto text-center flex flex-col items-center gap-3">
           <span
@@ -1880,7 +1879,7 @@ function CertificationSection() {
 function Clients() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
-    <section className="bg-white u-section">
+    <section id="clients" className="bg-white u-section scroll-mt-16 lg:scroll-mt-24">
       {/* .cl-logo(index.css)가 참조하는 alpha threshold filter — 화면에 그려지지 않는 정의 전용 SVG */}
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
         <filter id="cl-mono-alpha-cut">
@@ -2849,121 +2848,200 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
   const [filter, setFilter] = useState<PortfolioFilter>('전체')
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
 
-  // 2026-09-07: 임시 7개 랜딩용 PORTFOLIO 대신 기존 Touchgraphic Calendar Portfolio 실제 17개
-  // (CALENDAR_PORTFOLIO)로 교체. 원본에 기업/기관 분류 metadata가 없어 필터를 임의로 적용하지
-  // 않는다 — 버튼 UI는 그대로 두되(파괴적 변경 금지) "전체" 기준으로 17개가 항상 노출된다.
-  // 실제 기업/기관 분류가 필요하면 별도 데이터 결정이 필요하다(최종 보고 참고).
+  // 데이터(CALENDAR_PORTFOLIO, 17개)에 기업/기관 분류 metadata 가 없으므로(§src/data/calendarPortfolio.ts)
+  // filter 는 현재와 동일하게 "표시 전용" 이다 — 활성 상태만 바꾸고 목록은 항상 17개 전부 노출한다.
+  // 카드 라벨은 실제 필드(company ?? category)만 사용하고 임의 분류를 만들지 않는다.
   const items = CALENDAR_PORTFOLIO
-    .map((item, i) => ({ item, index: i }))
+
+  // Media Palette portfolio 의 Scroll Down 원형 그래픽과 같은 역할: 클릭 시 작품 grid 로 smooth scroll.
+  function scrollToGrid() {
+    const el = document.getElementById('portfolio-grid')
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }
+
+  // 중앙 content container — 레퍼런스처럼 화면 양끝에 붙이지 않고 1440 max 로 가둔다.
+  const PF_CONTAINER = 'mx-auto w-full max-w-[1440px] px-6 md:px-8'
 
   return (
     <div className="min-h-screen bg-white">
       <Header page="portfolio" navigate={navigate} />
 
-      {/* Hero — 이미지·장식 없이 넓은 whitespace 와 타이포그래피만으로 구성 */}
-      <section className="bg-white">
-        <div className={SHELL}>
-          <div className="pt-[140px] lg:pt-[236px] pb-[40px] lg:pb-[56px]">
-            <p
-              className="mb-4 lg:mb-6 text-[11px] lg:text-[12px] font-semibold tracking-[0.22em] uppercase text-black/45"
-              style={{ fontFamily: 'Courier New, monospace' }}
+      {/* ── Portfolio intro ── (Media Palette /portfolio 구조 참고:
+          좌측 큰 "Portfolio" heading / 우측 정렬 짧은 설명 / 우상단 Scroll Down 그래픽 /
+          하단 full-width thin rule / rule 아래 중앙 작은 speech-bubble button) */}
+      <section className="bg-white pt-[104px] lg:pt-[150px]">
+        <div className={PF_CONTAINER}>
+          <div className="relative lg:min-h-[172px]">
+            {/* Scroll Down 원형 그래픽 — 우상단, desktop 전용. accent 는 Touchagraphic CMYK 중 cyan. */}
+            <button
+              type="button"
+              onClick={scrollToGrid}
+              aria-label="작품 목록으로 스크롤"
+              className="hidden lg:grid place-items-center absolute right-0 -top-1 w-16 h-16 rounded-full"
+              style={{ backgroundColor: '#16B8E6' }}
             >
-              Portfolio
-            </p>
+              <span className="pf-scroll-ring absolute inset-[-18px]" aria-hidden>
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  <defs>
+                    <path id="pf-scroll-path" d="M50,50 m-35,0 a35,35 0 1,1 70,0 a35,35 0 1,1 -70,0" />
+                  </defs>
+                  <text fill="#0B0B0B" style={{ fontFamily: 'Courier New, monospace', fontSize: '11px', letterSpacing: '2px', fontWeight: 700 }}>
+                    <textPath href="#pf-scroll-path">SCROLL&nbsp;DOWN&nbsp;·&nbsp;SCROLL&nbsp;DOWN&nbsp;·&nbsp;</textPath>
+                  </text>
+                </svg>
+              </span>
+              <svg width="14" height="16" viewBox="0 0 14 16" fill="none" aria-hidden>
+                <path d="M7 1.5v11.5M2.5 8.5 7 13l4.5-4.5" stroke="#0B0B0B" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
             <h1
               className="text-black"
-              style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(34px, 6vw, 84px)', lineHeight: 1.18, letterSpacing: '-0.03em' }}
+              style={{ ...fontKr, fontWeight: 600, fontSize: 'clamp(44px, 7.4vw, 84px)', lineHeight: 1.1, letterSpacing: '-0.03em' }}
             >
-              달력으로 완성한<br />브랜드의 장면들.
+              Portfolio
             </h1>
+
+            <p
+              className="mt-6 lg:mt-0 lg:absolute lg:right-0 lg:bottom-0 lg:max-w-[360px] lg:text-right text-black/60 break-keep"
+              style={{ ...fontKr, fontSize: 'clamp(14px, 1.05vw, 16px)', lineHeight: 1.75 }}
+            >
+              달력으로 브랜드의 시간을 기록합니다.<br />
+              기업과 기관의 이야기를 한 장면에 담습니다.
+            </p>
           </div>
 
-          {/* Category filter — 정확히 3개, 즉시 client-side 필터(새로고침 없음) */}
-          <div className="pb-[20px] lg:pb-[28px] flex items-center gap-2.5">
-            {PORTFOLIO_FILTERS.map(f => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className="h-[42px] px-6 rounded-full text-[14px] font-semibold transition-colors leading-none"
-                style={{
-                  ...fontKr,
-                  background: filter === f ? '#1A1A1A' : '#FFFFFF',
-                  color: filter === f ? '#FFFFFF' : '#1A1A1A',
-                  border: filter === f ? '1px solid #1A1A1A' : '1px solid rgba(0,0,0,0.16)',
-                }}
-              >
-                {f}
-              </button>
-            ))}
+          {/* full-width thin rule — intro 와 filter/grid 영역을 명확히 분리 */}
+          <div className="mt-8 lg:mt-10 border-t border-black" />
+
+          {/* rule 아래 중앙 speech-bubble button → Landing 의 EstimatorSection (Header 견적 계산하기와 동일 helper) */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => navigate('/', { scrollTo: 'estimator-scroll-target' })}
+              className="relative mt-3 inline-flex items-center gap-1.5 rounded-[9px] border border-black bg-white px-6 py-3 text-black transition-colors hover:bg-black hover:text-white"
+              style={{ ...fontKr, fontSize: '14px', fontWeight: 500 }}
+            >
+              견적 계산기 바로가기
+              <span aria-hidden>→</span>
+              {/* 아래를 향하는 speech-bubble notch (검은 테두리 + 흰 채움) */}
+              <span
+                aria-hidden
+                className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                style={{ top: '100%', borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '7px solid #000' }}
+              />
+              <span
+                aria-hidden
+                className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                style={{ top: 'calc(100% - 1.5px)', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #fff' }}
+              />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Gallery — 기존 터치어그래픽 Portfolio(touchagraphic.com/portfolio) 의 촘촘한 4열 wall presentation을
-          직접 재현. 각 tile 은 검은 studio 배경 그대로 두고 object-fit: contain 으로 작품 전체를 보여준다
-          (landing rail 전용 objectPosition/mediaScale/cover crop 은 이 페이지에서 override 하여 쓰지 않는다 —
-          PORTFOLIO 데이터 자체는 건드리지 않는다). hairline 은 grid wrapper 배경이 아니라 각 tile 자체의 얇은
-          border로 만든다 — wrapper에 배경을 두면 (7개라 비는) 마지막 빈 셀까지 회색으로 칠해지기 때문에 쓰지
-          않는다. wrapper 자체는 항상 투명(=페이지 white)이라 빈 셀은 그냥 흰 배경으로 보인다.
-          폭: Hero/filter는 .u-shell(contained) 그대로 두고, gallery만 .u-gallery-wide로 breakout —
-          같은 width system을 강제로 맞추지 않고 "contained intro → wide wall" 위계를 준다. */}
-      <section className="bg-white pb-[100px] lg:pb-[160px]">
-        <div className="u-gallery-wide">
-          <div className="pt-[44px] lg:pt-[48px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-8 lg:gap-y-0 gap-x-0 pf-feed-item">
-            {items.map(({ item, index }) => {
+      {/* ── Filter ── grid 위 중앙. pill 형태(활성 dark bg + white / 비활성 white + thin gray border).
+          데이터에 기업/기관 분류가 없어 표시 전용이며, 즉시 client-side filtering 동작은 현재와 동일하게 유지한다. */}
+      <section className="bg-white">
+        <div className={PF_CONTAINER}>
+          <div className="mt-12 lg:mt-16 flex flex-wrap justify-center gap-2.5">
+            {PORTFOLIO_FILTERS.map(f => {
+              const on = filter === f
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className="h-[42px] px-6 rounded-full text-[14px] font-semibold leading-none transition-colors"
+                  style={{
+                    ...fontKr,
+                    background: on ? '#1A1A1A' : '#FFFFFF',
+                    color: on ? '#FFFFFF' : '#333333',
+                    border: on ? '1px solid #1A1A1A' : '1px solid rgba(0,0,0,0.18)',
+                  }}
+                >
+                  {f}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Portfolio grid ── desktop 3 / tablet 2 / mobile 1 열, 중앙 container 안(화면 양끝에 붙지 않음).
+          thumbnail 은 3:2(= 실제 이미지 공통 비율) wrapper + object-contain + black bg 로 절대 crop 되지 않는다. */}
+      <section className="bg-white pt-10 lg:pt-14 pb-[100px] lg:pb-[150px]">
+        <div className={PF_CONTAINER}>
+          <div
+            id="portfolio-grid"
+            className="scroll-mt-[88px] lg:scroll-mt-[112px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-12 lg:gap-y-[60px]"
+          >
+            {items.map((item, index) => {
               const accent = PF_ACCENTS[index % PF_ACCENTS.length]
-              const meta = item.company ?? item.category
+              const label = item.company ?? item.category
               return (
                 <button
                   key={item.idx}
                   type="button"
                   onClick={() => navigate(`/portfolio/${item.idx}`)}
-                  className="block w-full text-left cursor-pointer"
+                  className="group block w-full text-left"
                 >
-                  <div className="group relative overflow-hidden bg-black border border-white/[0.22]" style={{ aspectRatio: '3 / 2' }}>
+                  <div className="relative overflow-hidden rounded-[6px] bg-black" style={{ aspectRatio: '3 / 2' }}>
                     <img
                       src={item.thumbnail.src}
                       alt={item.title}
                       width={item.thumbnail.width}
                       height={item.thumbnail.height}
                       loading="lazy"
+                      decoding="async"
                       className="absolute inset-0 w-full h-full object-contain object-center"
                     />
-                    {/* hover panel — 기본은 카드 아래로 완전히 내려가 있다가(translate-y-full) hover 시 위로 슬라이드.
-                        데스크톱 전용(lg:group-hover) — 터치 tap 에는 반응하지 않아 모바일에서 어색하게 붙잡히지 않는다.
-                        4열로 tile 이 작아진 만큼 typography/padding 도 축소했다. */}
+                    {/* hover slide-up panel — 현재 Touchagraphic 구현 유지. desktop hover 에서만,
+                        thumbnail 내부에서 아래→위로 부드럽게 등장하고 카드 밖으로 넘치지 않는다. */}
                     <div
-                      className="absolute inset-0 hidden lg:flex flex-col items-center justify-center text-center px-4
-                                 translate-y-full lg:group-hover:translate-y-0
-                                 transition-transform duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-                      style={{ backgroundColor: pfRgba(accent, 0.9) }}
+                      className="absolute inset-0 hidden lg:flex flex-col items-center justify-center text-center px-5
+                                 translate-y-full group-hover:translate-y-0
+                                 transition-transform duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                      style={{ backgroundColor: pfRgba(accent, 0.92) }}
                     >
                       <span
                         className="text-white"
-                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 600, fontSize: 'clamp(15px, 1.3vw, 19px)', letterSpacing: '-0.02em' }}
+                        style={{ ...fontKr, fontWeight: 600, fontSize: 'clamp(15px, 1.2vw, 19px)', letterSpacing: '-0.02em', lineHeight: 1.4 }}
                       >
                         {item.title}
                       </span>
-                      <span className="text-white/50 my-1.5 leading-none text-[12px]" aria-hidden>+</span>
-                      <span
-                        className="text-white/80"
-                        style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 400, fontSize: '11px', letterSpacing: '0.01em' }}
-                      >
-                        {meta}
+                      <span className="my-2 leading-none text-white/55 text-[12px]" aria-hidden>+</span>
+                      <span className="text-white/80" style={{ ...fontKr, fontWeight: 400, fontSize: '12px' }}>
+                        {label}
                       </span>
                     </div>
                   </div>
 
-                  {/* mobile/tablet 전용 — hover 가 없으므로 tile 아래 기본 텍스트를 노출 */}
-                  <div className="lg:hidden pt-3">
-                    <span className="t-caption text-black/45">{meta}</span>
-                    <h3
-                      className="text-black mt-0.5"
-                      style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: '19px', letterSpacing: '-0.02em' }}
+                  {/* 항상 표시되는 metadata — [label] + project title (hover 와 무관) */}
+                  <div className="mt-4">
+                    <span
+                      className="inline-block text-black/60"
+                      style={{ ...fontKr, fontWeight: 600, fontSize: '13px', letterSpacing: '0.01em' }}
+                    >
+                      [{label}]
+                    </span>
+                    <p
+                      className="mt-2 text-black break-keep"
+                      style={{
+                        ...fontKr,
+                        fontWeight: 700,
+                        fontSize: 'clamp(16px, 1.35vw, 19px)',
+                        lineHeight: 1.4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
                     >
                       {item.title}
-                    </h3>
+                    </p>
                   </div>
                 </button>
               )
@@ -3358,6 +3436,85 @@ function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?
   )
 }
 
+// ── 우측 고정 섹션 내비게이터 (desktop 전용) ─────────────────────────────────
+// Landing 주요 section id 순서. 각 id 는 해당 section 태그에 이미 지정되어 있다.
+const SECTION_NAV_ITEMS = [
+  { id: 'hero', label: 'Intro' },
+  { id: 'portfolio', label: 'Portfolio' },
+  { id: 'estimator', label: 'Estimate' },
+  { id: 'certification', label: 'Certified' },
+  { id: 'clients', label: 'Clients' },
+  { id: 'faq', label: 'FAQ' },
+]
+
+function ScrollSectionNav() {
+  const [active, setActive] = useState(SECTION_NAV_ITEMS[0].id)
+
+  useEffect(() => {
+    const els = SECTION_NAV_ITEMS
+      .map(item => document.getElementById(item.id))
+      .filter((el): el is HTMLElement => el !== null)
+    if (els.length === 0) return
+
+    // 헤더 높이 아래 "읽는 기준선"에 걸쳐 있는 마지막 section을 active로 본다.
+    function onScroll() {
+      const referenceY = Math.max(160, window.innerHeight * 0.3)
+      let current = els[0].id
+      for (const el of els) {
+        if (el.getBoundingClientRect().top <= referenceY) current = el.id
+      }
+      setActive(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
+
+  function handleClick(id: string) {
+    const el = document.getElementById(id)
+    if (!el) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  }
+
+  return (
+    <nav
+      aria-label="섹션 바로가기"
+      className="hidden lg:flex fixed right-6 top-1/2 -translate-y-1/2 z-40 flex-col items-end gap-4"
+    >
+      {SECTION_NAV_ITEMS.map(item => {
+        const isActive = active === item.id
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => handleClick(item.id)}
+            aria-label={`${item.label} 섹션으로 이동`}
+            aria-current={isActive ? 'true' : undefined}
+            className="group relative flex items-center justify-end py-1"
+          >
+            <span
+              className={`mr-2.5 text-[10px] tracking-[0.08em] uppercase whitespace-nowrap transition-opacity duration-200 ${isActive ? 'opacity-100 text-black' : 'opacity-0 group-hover:opacity-60 text-black/70'}`}
+              style={{ fontFamily: 'Noto Sans KR, sans-serif' }}
+              aria-hidden
+            >
+              {item.label}
+            </span>
+            <span
+              className={`block rounded-full transition-all duration-200 ${isActive ? 'w-[6px] h-[6px] bg-black' : 'w-[4px] h-[4px] bg-black/25 group-hover:bg-black/45'}`}
+              aria-hidden
+            />
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // App 루트
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3394,7 +3551,7 @@ export default function App() {
     if (route !== '/' || !pendingScrollRef.current) return
     const id = pendingScrollRef.current
     pendingScrollRef.current = null
-    requestAnimationFrame(() => scrollToCenter(id))
+    requestAnimationFrame(() => scrollToAnchor(id))
   }, [route])
 
   useEffect(() => { if (view === 'landing') return; window.scrollTo(0, 0) }, [view])
@@ -3423,6 +3580,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-white">
       <Header page="landing" navigate={navigate} />
+      <ScrollSectionNav />
       <Hero />
       <Portfolio navigate={navigate} />
       <EstimatorSection onConsult={() => setView('consult')} />
