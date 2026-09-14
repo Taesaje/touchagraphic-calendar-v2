@@ -145,6 +145,100 @@ This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin con
 19. `fontFamily`가 인라인으로 지정된 부분이 있을 수 있으므로 폰트 변경 시 `src/index.css`와 `src/App.tsx` 양쪽을 확인한다.
 20. 사용자가 명확히 요청하지 않은 리팩터링, 파일 구조 변경, 라이브러리 교체는 하지 않는다.
 
+## Engineering Guardrails
+
+목적은 기능 추가가 아니라, "일단 동작하게 만드는 AI 코딩"만 반복되어 구조가 무너지지 않도록
+장기 유지보수·인수인계·데이터 일관성·보안·기술부채를 작업 위험도에 맞게 자연스럽게 고려하는 것이다.
+위 Project-specific working rules(디자인·UI 영역)를 대체하지 않고, 그보다 상위의 코드/데이터/아키텍처
+판단 기준을 다룬다. 이 규칙 때문에 작은 CSS/카피 수정까지 무겁게 만들지 않는다 — §과잉 설계 방지 참고.
+
+### 기본 원칙
+
+1. 실제 repository와 현재 코드가 source of truth다. 과거 대화, 요약, 추정값보다 현재 구현을 우선한다.
+2. 새 기능을 추가하기 전에 기존 component / data model / helper / route / service를 먼저 확인한다.
+3. 같은 business data를 여러 곳에 중복 정의하지 않는다. 가능한 한 하나의 source of truth를 사용한다.
+4. 기존 구조로 해결할 수 있다면 새로운 별도 구조를 만들지 않는다.
+5. 단기적으로 동작하게 하기 위한 임시 구현을 장기 architecture처럼 남기지 않는다.
+6. 한 파일이나 component가 너무 많은 책임을 가지기 시작하면 기능 추가 전에 분리 필요성을 검토한다.
+   현재 `src/App.tsx` 중심 구조(§Where things live)는 지금 프로젝트 단계에서는 허용되는 구조이지만,
+   영구적인 architecture constraint는 아니다 — Estimator / Contact / DB / Admin 등 기능 경계가
+   커지면서 책임이 명확히 분리될 경우에는 component/feature 단위 분리를 검토할 수 있다. 단 사용자의
+   승인 없이 대규모 리팩터링하거나 파일 구조를 임의로 바꾸지 않는다(§Project-specific working rules 20).
+7. UI 수정과 architecture 변경을 불필요하게 한 작업에 섞지 않는다.
+8. 가격 / 상품 조건 / 제작 규칙 등 business rule을 추측하지 않는다. 확인되지 않은 값은 임의 구현하지
+   말고 보고한다(§Project-specific working rules 5의 견적 계산기 보호 원칙을 프로젝트 전반의 business
+   rule로 확장한 것).
+9. 데이터가 여러 기능을 거치는 경우(예: Estimator → Contact → DB → Admin → Analytics) 전체 흐름을
+   고려한다. 각 화면마다 같은 데이터를 새로 정의하지 않는다.
+10. 사용자 정상 흐름뿐 아니라 필요한 경우 refresh, back navigation, 중복 제출, loading, network
+    failure, invalid state, empty state도 고려한다. 단 작은 UI 작업에서는 불필요하게 적용하지 않는다.
+11. DB / API / Auth / 개인정보 / 이메일 / Analytics 등 production 위험도가 높은 영역에서는 바로
+    구현하지 말고 구조와 보안 경계를 먼저 확인한다.
+12. 비밀키 / DB 관리자 key / password 등은 frontend source나 Git에 포함하지 않는다.
+13. 기존 기능이 정상 동작하고 있다면 리팩터링을 명분으로 불필요하게 재작성하지 않는다
+    (§Project-specific working rules 20과 동일한 원칙).
+14. 기능 구현 후 최소한 핵심 사용자 flow, `npm run build`, `git diff`, `git diff --check`를 확인한다.
+15. 명시적으로 승인받기 전에는 commit / push / deploy 하지 않는다.
+
+### 작업 위험도에 따른 대응 규칙
+
+모든 작업을 같은 무게로 처리하지 않는다.
+
+**LOW RISK** — 문구 수정, 이미지 변경, 간격, 색상, 단순 스타일 등.
+바로 구현 가능. 과도한 architecture 분석 금지.
+
+**MEDIUM RISK** — routing, state, Estimator option, data structure, shared component, 여러 화면 간
+데이터 전달 등.
+① 기존 구조 확인 → ② 기존 source of truth 확인 → ③ 중복 구조 생성 여부 확인 → ④ 최소 변경 구현
+→ ⑤ 핵심 flow 검수.
+
+**HIGH RISK** — DB, API, Admin, Authentication, 개인정보, 이메일 발송, Analytics architecture, 권한,
+production security 등.
+① 바로 구현하지 않는다 → ② 현재 architecture 확인 → ③ 데이터 흐름 설계 → ④ security boundary 확인
+→ ⑤ 실패 시나리오 확인 → ⑥ 구현 → ⑦ 별도 검수.
+이 범주는 아래 "Work 자율 실행과 스몰비 Project 판단 연계"의 "기능, 가격, 데이터, 라우팅 등 보호
+영역 변경이 필요해진 경우" 전달 절차를 그대로 따른다 — 구현 전에 중요한 architecture 결정사항을
+사용자(또는 스몰비 Project)에게 먼저 보고한다.
+
+### 과잉 설계 방지
+
+이 규칙 때문에 불필요한 abstraction을 만들지 않는다. 아직 필요하지 않은 거대한 framework, 과도한
+service layer, 지나친 component 분리, 미래를 추측한 복잡한 generic system을 만들지 않는다.
+원칙: "현재 요구사항을 깔끔하게 해결하면서 다음 단계에서 확장 가능한 정도"까지만 설계한다.
+
+### 기술부채 보고 규칙
+
+MEDIUM 또는 HIGH RISK 작업이 끝났을 때는 필요한 경우 완료 보고에 "이번 변경으로 새롭게 생긴 기술부채
+또는 향후 주의점"을 짧게 포함한다. 문제가 없으면 "없음"이라고 한다. 있다면 예: "Estimator data가 아직
+App.tsx 내부에 있어 DB 연결 전 분리 권장"처럼 구체적으로 적는다.
+발견했다고 무조건 즉시 리팩터링하지 않는다 — 사용자에게 먼저 알려준다.
+
+### Architecture Audit 규칙
+
+기능 추가와 별도로 Senior Engineer 관점의 architecture audit을 아래 기준으로 수행한다.
+
+**권장** — Estimator + Contact 완성 후 / DB·Admin 구축 후 / 대규모 기능이 여러 개 누적된 경우.
+
+**필수** — Production 공개 전. 이 시점의 architecture / security / handoff audit은 선택이 아니라
+반드시 한 번 수행한다.
+
+Audit에서는 최소한 component 책임, 파일 비대화, duplicated data, source of truth, hard-coded
+business rule, state flow, routing, data model, error handling, security boundary, type safety,
+testability, handoff difficulty를 검토한다.
+
+평가 기준: P0 = Production 전 반드시 수정 / P1 = 가까운 시일 내 수정 권장 / P2 = 현재 유지 가능 /
+P3 = 취향 또는 개선 수준.
+
+### 인수인계 가능성
+
+이 프로젝트는 현재 비개발자가 AI-assisted 방식으로 구축하고 있지만, 향후 다른 담당자 또는 외부
+개발사가 인수할 가능성이 있다(§BUILDING_PROFILE 12 "장기 프로젝트 운영 원칙" 참고 — 대화가 아니라
+실제 코드/프로젝트 파일이 source of truth). 중요한 architecture 결정은 "현재 작성한 Claude만 이해하는
+구조"가 되어서는 안 된다. 다른 개발자가 repository를 처음 열었을 때도 어디가 source of truth인지,
+데이터가 어디서 어디로 흐르는지, 어떤 부분이 business rule인지, 어떻게 build/deploy 하는지 파악할 수
+있어야 한다. 단 모든 코드를 과도하게 주석 처리하지 않는다 — 중요한 결정과 비직관적인 구조에만 설명을
+남긴다.
+
 ## Work 자율 실행과 스몰비 Project 판단 연계
 
 Work는 로컬 구현·검수·오류 수정을 자율적으로 끝내고, 스몰비 Project는 브랜드·디자인·마케팅·중요 구조의 상위 판단을 담당한다.

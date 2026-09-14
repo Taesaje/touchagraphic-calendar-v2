@@ -96,8 +96,8 @@ function SLabel({ children, light = false }: { children: string; light?: boolean
 }
 
 // ── 앱 상태 타입 ─────────────────────────────────────────────────────────────
-type AppView = 'landing' | 'consult'
-
+// (legacy: 예전 AppView='landing'|'consult' 상태 머신은 EstimatorInline → InquiryPage
+//  라우팅 전환으로 대체되어 제거함. §ConsultForm 은 참조용으로 남겨두되 렌더하지 않는다)
 type Sels = {
   quantity: number
   material: string
@@ -159,55 +159,88 @@ type AddonDef = {
 type TierDef = {
   name: string; subtitle: string
   breakdown: BreakdownItem[]
+  // 순수 텍스트 옵션(라벨→선택지 배열) 자리 — 현재는 어떤 tier도 사용하지 않는다(커스텀/하이앤드에
+  // 있던 '내지 레이아웃'은 베이직에만 필요한 옵션이라 제거함). 향후 텍스트형 옵션이 다시 필요할 때를
+  // 위해 남겨둔다.
   options?: Record<string, string[]>
+  sizes: SizeOption[]
   addon?: AddonDef
   rules: string[]
+  // 베이직 전용 — "표지 디자인 수정 2회 한정" 같은 rules 와 위계를 분리한, 고정된 제작 사양
+  // 정보 블록(양면 28P · 블랙 삼각대 · 철링). 선택 불가능한 항목을 disabled 컨트롤로 늘어놓는
+  // 대신 안내 텍스트로만 보여준다.
+  fixedSpec?: string[]
 }
 type TierId = 'template' | 'custom_basic' | 'custom_highend'
 
-// 베이직 전용 보조 옵션 — 종이 사양. 가격 데이터가 없어 계산에는 연결하지 않고
-// consultation 전달용 선택 정보로만 사용한다 (표지 스타일과 동일한 위계).
-type PaperType = 'undecided' | 'snow' | 'rendezvous'
-const PAPER_TYPE_OPTIONS: { id: PaperType; label: string }[] = [
+// ── 사이즈 정책 ──────────────────────────────────────────────────────────────
+// 사이즈는 등급마다 같은 추상 라벨(A·가로형 등)을 쓰던 방식을 버리고 실제 규격(mm)을 그대로
+// 보여준다. 베이직은 기성 사이즈 4종만, 커스텀/하이앤드는 기성 4종 + '별도 사이즈'.
+// 사이즈는 가격 계산에 반영되지 않는 표시 전용 선택이라 구조를 바꿔도 total 에는 영향 없다.
+type SizeOption = {
+  id: string
+  w: number; h: number   // mm — 별도 사이즈는 0/0(표시 시 라벨을 따로 씀)
+  maxQuantity?: number    // 이 수량을 넘으면 선택 불가(280×125·96×121 = 300개 이하)
+  custom?: boolean        // '별도 사이즈' — 가격 계산 없이 별도 상담으로 안내
+}
+function sizeLabel(s: SizeOption) {
+  return s.custom ? '별도 사이즈' : `${s.w} × ${s.h} mm`
+}
+const STOCK_SIZES: SizeOption[] = [
+  { id: '260x190', w: 260, h: 190 },
+  { id: '297x210', w: 297, h: 210 },
+  { id: '280x125', w: 280, h: 125, maxQuantity: 300 },
+  { id: '96x121',  w: 96,  h: 121, maxQuantity: 300 },
+]
+const CUSTOM_SIZE_OPTION: SizeOption = { id: 'custom', w: 0, h: 0, custom: true }
+const CUSTOM_TIER_SIZES: SizeOption[] = [...STOCK_SIZES, CUSTOM_SIZE_OPTION]
+// 수량이 사이즈의 최대 제작 수량을 넘는지 — EstimatorInline/InquiryPage 양쪽에서 재사용.
+function sizeQuantityExceeded(opt: SizeOption, quantity: number | null) {
+  return !!(opt.maxQuantity && quantity !== null && quantity > opt.maxQuantity)
+}
+
+// ── 베이직 전용 — 표지 / 내지 디자인 시안 ─────────────────────────────────────
+// 표지는 "붉은양 일러스트" / "2027 그래픽" 두 계열, 각 계열 안에 실제 시안 6개 중 1개를
+// 고른다. 내지는 계열 구분 없이 실제 디자인 6개 중 1개. 실제 asset은 아직 준비되지 않아
+// image: null 상태 — 이 경우 DesignTile이 "이미지 준비중" placeholder로 표시한다(§DesignTile).
+// 실제 파일이 생기면 image 자리에 import 경로만 채우면 된다(가격 계산과 무관, 표시 전용).
+type DesignOption = { id: string; label: string; image: string | null }
+type CoverDesignFamily = { id: string; name: string; designs: DesignOption[] }
+function makeDesignSlots(prefix: string, count: number): DesignOption[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${prefix}-${i + 1}`,
+    label: `시안 ${String(i + 1).padStart(2, '0')}`,
+    image: null as string | null,
+  }))
+}
+const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
+  { id: 'red-sheep',    name: '붉은양 일러스트', designs: makeDesignSlots('red-sheep', 6) },
+  { id: '2027-graphic', name: '2027 그래픽',    designs: makeDesignSlots('2027-graphic', 6) },
+]
+const INNER_DESIGNS: DesignOption[] = makeDesignSlots('inner', 6)
+
+// 베이직 전용 종이 사양 — "미정"을 없애고 실제 제공 사양 중 하나를 반드시 고르게 한다.
+// 값 자체는 기존 Estimator 데이터(스노우지/랑데뷰지)를 그대로 쓴다.
+type PaperSpecId = 'snow' | 'rendezvous'
+const PAPER_SPEC_OPTIONS: { id: PaperSpecId; label: string }[] = [
   { id: 'snow', label: '스노우지' },
   { id: 'rendezvous', label: '랑데뷰지' },
-  { id: 'undecided', label: '미정' },
 ]
 
-// 베이직 전용 '표지 스타일' 선택("불꽃양 그래픽" / "2027 타이포그래피")과 연동되는
-// 실물 제작 예시 사진 슬롯. 라벨 → key 매핑을 거치는 이유는 옵션 배열 순서가 아니라
-// 실제 표시 문구를 기준으로 안전하게 연결하기 위함이다.
-// 사진이 준비되면 import 해서 아래 배열의 null 자리에 넣기만 하면 preview 가
-// placeholder 대신 실제 이미지로 자동 교체된다. (가격 계산과 무관, 표시 전용)
-type CoverStyleKey = 'graphic' | 'typography'
-const COVER_STYLE_TO_KEY: Record<string, CoverStyleKey> = {
-  '불꽃양 그래픽': 'graphic',
-  '2027 타이포그래피': 'typography',
-}
-const COVER_STYLE_PREVIEWS: Record<CoverStyleKey, (string | null)[]> = {
-  graphic: [null, null],
-  typography: [null, null],
-}
-
-// 옵션 값·개수는 기존 template 기준 그대로. 모든 tier가 동일한 사이즈 / 내지 레이아웃
-// step 을 갖도록 세 등급에 같은 배열을 공유한다. (옵션은 total 계산에 반영되지 않는 표시 전용)
+// 옵션 값·개수는 기존 template 기준 그대로. (옵션은 total 계산에 반영되지 않는 표시 전용)
 const TIER_DATA: Record<TierId, TierDef> = {
   template: {
     name: '베이직 (실속형)',
-    subtitle: '기본 디자인을 활용해 예산은 줄이고 필요한 내용만 맞춰 제작합니다.',
+    subtitle: '준비된 디자인과 정해진 제작 사양 안에서 선택해 합리적인 가격으로 제작합니다.',
     breakdown: [
       { label: '템플릿 이용료', value: 100000 },
       { label: '표지 디자인',   value: 300000 },
       { label: '내지 세팅',     value: 500000 },
     ],
-    options: {
-      '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
-      '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
-      '표지 스타일':  ['불꽃양 그래픽', '2027 타이포그래피'],
-    },
+    sizes: STOCK_SIZES,
+    fixedSpec: ['양면 28P 기준', '블랙 삼각대', '철링'],
     rules: [
-      '표지 수정 2회 한정',
-      '내지 12p, 사진/텍스트 단순 치환 (레이아웃 변경 불가)',
+      '표지 디자인 수정 2회 한정 (레이아웃 변경 불가)',
       '인쇄/배송 실비 별도',
     ],
   },
@@ -220,10 +253,7 @@ const TIER_DATA: Record<TierId, TierDef> = {
       { label: '내지 디자인 (24p)',  value: 2400000 },
       { label: 'AI 비주얼 애드온',   value:  400000 },
     ],
-    options: {
-      '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
-      '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
-    },
+    sizes: CUSTOM_TIER_SIZES,
     rules: ['기획안 3종 제안', '인쇄 실비 별도'],
   },
   custom_highend: {
@@ -234,10 +264,7 @@ const TIER_DATA: Record<TierId, TierDef> = {
       { label: '키비주얼 표지',     value: 2000000 },
       { label: '내지 디자인 (24p)', value: 4800000 },
     ],
-    options: {
-      '사이즈':       ['A · 가로형', 'B · 세로형', 'C · 정사각', 'D · 와이드'],
-      '내지 레이아웃':['2분할', '4분할', '5분할', '미니 달력형'],
-    },
+    sizes: CUSTOM_TIER_SIZES,
     rules: [
       '인터뷰/만남 기반 전용 기획, 디렉팅 총괄',
       '지류/특수 후가공 맞춤 견적',
@@ -256,6 +283,94 @@ function tierBaseTotal(id: TierId) {
 
 function wonFmt(n: number) {
   return Math.round(n).toLocaleString('ko-KR')
+}
+
+// ── 상담(Contact) 통합 데이터 모델 ───────────────────────────────────────────
+// Header "상담 문의"(일반)와 Estimator "이 견적으로 상담 신청하기"(견적)가 동일한
+// InquiryPage / 동일한 submit 구조를 공유하기 위한 타입. 옵션 값은 전부 위 TIER_DATA /
+// COVER_DESIGN_FAMILIES / INNER_DESIGNS / PAPER_SPEC_OPTIONS / STOCK_SIZES 를 참조해서
+// 파생하며, 여기서 새 옵션명을 만들지 않는다.
+//
+// resolved 는 "이 견적으로 상담 신청하기"를 누른 시점에 고정한 표시용 snapshot이다 —
+// 이후 TIER_DATA 가격이 바뀌어도 당시 사용자가 실제로 본 조건·금액 그대로 남아야 하므로
+// 원시 선택값("견적 다시 수정하기" 복원용)과 분리해 둔다. 필드를 구조화된 id 로 유지하는
+// 이유는 상담 페이지(InquiryPage) payload 에서 문자열이 아니라 그대로 재사용하기 위함이다.
+type EstimateSnapshot = {
+  tier: TierId
+  optIdx: Record<string, Record<string, number | null>>  // 남은 텍스트 옵션(커스텀/하이앤드 내지 레이아웃)
+  // 베이직 전용 원시 선택값 — "견적 다시 수정하기" 복원용
+  coverFamilyId: string | null
+  coverDesignId: string | null
+  innerDesignId: string | null
+  paperSpecId: PaperSpecId | null
+  sizeId: string | null
+  customSizeText: string
+  quantity: number | null
+  resolved: {
+    tierName: string
+    subtitle: string
+    options: { group: string; label: string }[]
+    coverFamily: string | null
+    coverDesignLabel: string | null
+    innerDesignLabel: string | null
+    size: string | null
+    customSizeText: string | null
+    paperSpec: string | null
+    quantity: number | null
+    fixedSpec: string[]
+    total: number
+  }
+  createdAt: string
+}
+
+const ESTIMATE_SESSION_KEY = 'touchagraphic:estimate-snapshot'
+function loadEstimateSnapshot(): EstimateSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(ESTIMATE_SESSION_KEY)
+    return raw ? (JSON.parse(raw) as EstimateSnapshot) : null
+  } catch { return null }
+}
+function saveEstimateSnapshot(snap: EstimateSnapshot) {
+  try { sessionStorage.setItem(ESTIMATE_SESSION_KEY, JSON.stringify(snap)) } catch { /* 세션 백업 실패는 무시 */ }
+}
+
+type InquiryType = 'general' | 'estimate'
+type InquirySource = 'header_contact' | 'estimator'
+type CustomerType = '기업' | '공공기관' | '기타' | ''
+
+// 하나의 submission 모델 — general/estimate 두 모드가 이 타입 하나를 공유한다.
+type InquiryPayload = {
+  site: string
+  project: string
+  inquiry_type: InquiryType
+  source: InquirySource
+  company: string
+  customer_type: CustomerType
+  name: string
+  phone: string
+  email: string
+  message: string
+  production: {
+    grade: string
+    size: string
+    quantity: string
+    cover_style: string    // 베이직 표지 계열명(붉은양 일러스트/2027 그래픽), 해당 없으면 ''
+    cover_design: string   // 베이직에서 고른 실제 시안 라벨, 해당 없으면 ''
+    inner_design: string   // 베이직에서 고른 실제 내지 디자인 라벨, 해당 없으면 ''
+    inner_layout: string   // 커스텀/하이앤드의 내지 레이아웃 텍스트 옵션, 해당 없으면 ''
+    paper_spec: string
+  }
+  estimate: {
+    estimated_price: number | null
+    snapshot: EstimateSnapshot['resolved'] | null
+  }
+}
+
+// 실제 접수 backend가 아직 확정되지 않았다 — 임의 endpoint로 전송하지 않고, 나중에 실제
+// API가 정해지면 이 함수 내부만 교체하면 되도록 어댑터 하나로 모은다(§AGENTS).
+async function submitInquiry(payload: InquiryPayload): Promise<{ ok: true }> {
+  console.log('[submitInquiry] 백엔드 미연결 — payload만 확인', payload)
+  return { ok: true }
 }
 
 function getLabelFor(key: keyof Sels, sels: Sels): string {
@@ -390,9 +505,25 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/[0.07]">
       <div className={`${SHELL} h-[64px] lg:h-[96px] grid grid-cols-[1fr_auto_1fr] items-center gap-6`}>
-        {/* 좌: 텍스트 로고 */}
-        <a href="/" onClick={handleLogoClick} className="justify-self-start text-[17px] lg:text-[22px] font-extrabold tracking-[-0.02em] text-black leading-none" style={fontKr}>
-          터치어그래픽
+        {/* 좌: 브랜드 심볼 + 워드마크 lock-up — public/brand/touchagraphic-symbol.png(CMYK 4분할 원형
+            심볼, 색상/비율/black line 그대로) + 기존 텍스트 워드마크를 하나의 Home 버튼으로 묶는다.
+            심볼은 decorative(alt=""·aria-hidden)로 두고 aria-label을 링크 전체에 달아 스크린리더가
+            "터치어그래픽 홈"만 한 번 읽게 한다. 텍스트 스타일(size/weight/tracking/leading)은 그대로 유지. */}
+        <a
+          href="/"
+          onClick={handleLogoClick}
+          aria-label="터치어그래픽 홈"
+          className="justify-self-start inline-flex items-center gap-2 lg:gap-2.5"
+        >
+          <img
+            src="/brand/touchagraphic-symbol.png"
+            alt=""
+            aria-hidden="true"
+            className="h-[22px] w-[22px] lg:h-[30px] lg:w-[30px] shrink-0 object-contain"
+          />
+          <span className="text-[17px] lg:text-[22px] font-extrabold tracking-[-0.02em] text-black leading-none" style={fontKr}>
+            터치어그래픽
+          </span>
         </a>
 
         {/* 중앙: rounded gray nav container (desktop 전용) */}
@@ -443,15 +574,20 @@ function Hero() {
   return (
     <section id="hero" className="bg-white">
       <div className={SHELL}>
-        {/* 상단 pt = 고정 헤더 높이 + reference의 헤더→descriptor 간격.
-            하단 pb: 2026-09-07 refinement — Hero→Portfolio 전환을 좀 더 빠르게 이어지도록 축소
-            (80→56 / 44→36, Portfolio 쪽 pt 축소와 함께 적용. Hero 내부 배치는 불변). */}
-        <div className="pt-[112px] lg:pt-[200px] pb-[36px] lg:pb-[56px]">
+        {/* 상단 pt = 고정 헤더 높이 + Header→Hero 여백. media-palette.co.kr 첫 화면을 실측(헤더 높이·
+            eyebrow까지 거리)해보면 이전 값(112/200)과 절대 gap 자체는 비슷했지만, 그 사이트는 이 여백을
+            "의도적으로 짧게" 쓰고 헤드라인 쪽에 밀도를 더 준다 — 그래서 여기서도 여백을 확실히 줄이되
+            완전히 붙이지는 않는다(editorial Hero 톤 유지). 하단 pb: 2026-09-07 refinement — Hero→Portfolio
+            전환을 좀 더 빠르게 이어지도록 축소(80→56 / 44→36, Portfolio 쪽 pt 축소와 함께 적용. 하단은
+            이번에 다시 건드리지 않음). */}
+        <div className="pt-[96px] lg:pt-[152px] pb-[36px] lg:pb-[56px]">
           {/* 2026-09-07 refinement — wide desktop(1600px+)에서 좌측 headline과 우측 supporting
               copy 사이 gutter가 실측 1000px+ 로 벌어져 두 블록이 "떠 있는" 것처럼 보이던 문제를
               u-content-max(1600px 캡)로 해결. 좌측 시작선(.u-shell)은 그대로 유지. */}
           <div className="u-content-max">
-            {/* descriptor + headline 을 하나의 title group 으로 — 간격 좁게, descriptor 는 작은 heading 톤 */}
+            {/* descriptor + headline 을 하나의 title group 으로 — 간격 좁게, descriptor 는 작은 heading 톤.
+                이 eyebrow는 서비스 설명이 아니라 브랜드명을 보여주는 자리로 바뀌었다 — Header 로고
+                lock-up(§Header)이 identity, 이쪽은 editorial한 브랜드 label 역할로 자연스럽게 구분된다. */}
             <span
               className="inline-flex items-center gap-2 rounded-full mb-4 lg:mb-[18px] text-[11px] lg:text-[12px] font-semibold text-black/80"
               style={{ ...fontKr, letterSpacing: '-0.01em', border: '0.8px solid rgba(0,0,0,0.35)', padding: '3px 12px' }}
@@ -462,15 +598,19 @@ function Hero() {
                 <span className="w-[5px] h-[5px] rounded-full" style={{ background: '#FDF251' }} />
                 <span className="w-[5px] h-[5px] rounded-full bg-black/80" />
               </span>
-              기업·기관 맞춤형 달력 제작 회사
+              터치어그래픽
             </span>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-10 lg:gap-x-8">
-              {/* 좌: 큰 2줄 headline — 줄 간격은 line-height로만 (flex gap 미사용). 2026-09-07: wide
-                  desktop에서 존재감을 키우기 위해 clamp 상한 66px→80px */}
+              {/* 좌: 큰 2줄 headline — 줄 간격은 line-height로만(flex gap 미사용). 2026-09-07: wide
+                  desktop에서 존재감을 키우기 위해 clamp 상한 66px→80px. line-height 1.14 → 1.28로 조정 —
+                  media-palette.co.kr 첫 헤드라인을 실측하면 line-height/font-size 비율이 ≈1.33이라 두 줄이
+                  또렷이 분리돼 읽힌다. 여기서는 우리 폰트가 이미 더 크고(clamp 상한 80px) 볼드가 강해
+                  1.33까지 다 따라가면 오히려 느슨해 보여서, "겹쳐 보이지 않으면서도 압도감은 유지"되는
+                  1.28로 절충했다. */}
               <h1
                 className="lg:col-span-7 min-w-0 text-black"
-                style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(36px, 5.2vw, 80px)', lineHeight: 1.14, letterSpacing: '-0.025em' }}
+                style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(36px, 5.2vw, 80px)', lineHeight: 1.28, letterSpacing: '-0.025em' }}
               >
                 기업 / 기관<br />달력 제작 회사
               </h1>
@@ -572,23 +712,26 @@ type PortfolioItem = {
   // Portfolio 전체보기 페이지(/portfolio) 전용 필터 분류. 위 표시용 category 와는 별개 개념 —
   // Landing 카드의 category 는 그대로 두고 이 필드만 추가로 사용한다.
   filterType?: '기업' | '기관'
+  // CALENDAR_PORTFOLIO(src/data/calendarPortfolio.ts)의 실제 project.idx — 이 카드를 클릭했을 때
+  // /portfolio/:idx 로 이동할 실제 상세페이지를 가리킨다(§AGENTS: 안정적인 식별값으로 연결).
+  portfolioIdx: number
 }
 const PORTFOLIO: PortfolioItem[] = [
   { src: hpSanggong, category: '공공기관', title: '대한상공회의소',
-    description: '상징 비주얼을 활용한 데스크 캘린더', objectPosition: 'center 50%', mediaScale: 1.55, filterType: '기관' },
+    description: '상징 비주얼을 활용한 데스크 캘린더', objectPosition: 'center 50%', mediaScale: 1.55, filterType: '기관', portfolioIdx: 1879 },
   { src: hpIdeadoit, category: '기업', title: '아이디어두잇',
-    description: '브랜드 메시지를 담은 오브제형 캘린더', objectPosition: 'center center', filterType: '기업' },
+    description: '브랜드 메시지를 담은 오브제형 캘린더', objectPosition: 'center center', filterType: '기업', portfolioIdx: 958 },
   { src: hpSumok, category: '일러스트', title: '한국수목정원관리원',
-    description: '자연의 이미지를 담은 일러스트 캘린더', objectPosition: 'center 51%', mediaScale: 1.5, filterType: '기관' },
+    description: '자연의 이미지를 담은 일러스트 캘린더', objectPosition: 'center 51%', mediaScale: 1.5, filterType: '기관', portfolioIdx: 1880 },
   { src: hpDongaDesk, category: '기업', title: '동아쏘시오그룹',
     description: '따뜻한 일러스트로 완성한 데스크 캘린더', objectPosition: 'center center',
-    secondaryImages: [hpDongaDiary], filterType: '기업' },
+    secondaryImages: [hpDongaDiary], filterType: '기업', portfolioIdx: 1870 },
   { src: hpHampyeong, category: '공공기관', title: '함평군농업기술센터',
-    description: '전시 작품을 활용한 벽걸이 캘린더', objectPosition: 'center 48%', mediaScale: 1.38, filterType: '기관' },
+    description: '전시 작품을 활용한 벽걸이 캘린더', objectPosition: 'center 48%', mediaScale: 1.38, filterType: '기관', portfolioIdx: 1873 },
   { src: hpImagine, category: '일러스트', title: 'IMAGINE SEOUL',
-    description: '아트워크 중심의 일러스트 캘린더', objectPosition: 'center center', mediaScale: 1.4, filterType: '기업' },
+    description: '아트워크 중심의 일러스트 캘린더', objectPosition: 'center center', mediaScale: 1.4, filterType: '기업', portfolioIdx: 990 },
   { src: hpSejong, category: '기업', title: '세종스포츠정형외과',
-    description: '스포츠 테마를 활용한 맞춤형 캘린더', objectPosition: 'center center', filterType: '기업' },
+    description: '스포츠 테마를 활용한 맞춤형 캘린더', objectPosition: 'center center', filterType: '기업', portfolioIdx: 1881 },
 ]
 
 const RAIL_PAD = 'u-rail-pad'
@@ -597,7 +740,11 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   // 가격 계산과 무관한 UI 전용 ref — 마우스 드래그 상태 (라이브러리 없이 native scrollLeft)
-  const drag = useRef({ active: false, startX: 0, startScroll: 0 })
+  // active: pointerdown 이후 아직 pointerup 전(클릭인지 드래그인지 미확정 포함)
+  // dragStarted: 실제 이동 threshold 를 넘어 드래그로 확정된 뒤에만 true(그 전까지는 pointer capture 를
+  // 걸지 않아야 카드 button 의 click 이벤트가 정상적으로 도착한다 — 아래 onPointerMove 참고)
+  const drag = useRef({ active: false, startX: 0, startScroll: 0, dragStarted: false })
+  const DRAG_THRESHOLD = 6
   // 자동 이동 상태 — 전부 rAF + setTimeout + ref 로만 관리 (프레임마다 React rerender 없음).
   const auto = useRef({
     raf: 0, holdTimer: 0, resumeTimer: 0,
@@ -730,15 +877,18 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
       tween((idx + dir) * a.step, SLIDE_MS, () => scheduleResume(1400))
     }
 
-    // ── 카드 이미지 hover ── (hover 중 정지, leave 후 ~1000ms 뒤 재개)
+    // ── 카드 hover ── (hover 중 정지, leave 후 ~1000ms 뒤 재개)
+    // 카드 전체(button, data-card)가 클릭 가능 영역이므로 pause 판정도 이미지(data-card-img)뿐 아니라
+    // 카드 전체 기준이어야 한다 — 이미지 밖 제목/설명 텍스트에 hover 중일 때도 auto-slide 가 계속
+    // 진행되면 클릭 시점에 카드가 커서 아래에서 이미 밀려나 있어 클릭이 다른 카드로 새거나 씹힌다.
     const onOver = (e: PointerEvent) => {
-      if (!(e.target as Element)?.closest?.('[data-card-img]')) return
+      if (!(e.target as Element)?.closest?.('[data-card]')) return
       a.cardHover = true
       clearTimers(); clearResume()
     }
     const onOut = (e: PointerEvent) => {
-      if (!(e.target as Element)?.closest?.('[data-card-img]')) return
-      if ((e.relatedTarget as Element | null)?.closest?.('[data-card-img]')) return // 옆 카드로 이동 — 계속 pause
+      if (!(e.target as Element)?.closest?.('[data-card]')) return
+      if ((e.relatedTarget as Element | null)?.closest?.('[data-card]')) return // 옆 카드로 이동 — 계속 pause
       a.cardHover = false
       scheduleResume(1100)
     }
@@ -798,16 +948,25 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
     if (e.pointerType === 'touch') return // 터치 스와이프는 네이티브 스크롤에 맡긴다
     const el = viewportRef.current
     if (!el) return
-    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft }
-    el.setPointerCapture?.(e.pointerId)
-    el.style.cursor = 'grabbing'
-    el.style.userSelect = 'none'
-    auto.current.onDragStart() // auto motion 즉시 정지 (hover 보다 우선)
+    // 여기서는 아직 setPointerCapture 를 걸지 않는다 — pointerdown 시점엔 클릭인지 드래그인지
+    // 알 수 없는데, 미리 capture 를 걸면(구버전 동작) 카드 button 의 click 이벤트 전달이 브라우저에
+    // 따라 불안정해져(pointerup 이 capture 대상으로 재타겟) 카드 클릭이 씹히는 문제가 있었다.
+    // 실제 이동(threshold)이 확인된 뒤에만 onPointerMove 에서 드래그로 확정한다.
+    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, dragStarted: false }
   }
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const el = viewportRef.current
     if (!el || !drag.current.active) return
-    el.scrollLeft = drag.current.startScroll - (e.clientX - drag.current.startX)
+    const dx = e.clientX - drag.current.startX
+    if (!drag.current.dragStarted) {
+      if (Math.abs(dx) < DRAG_THRESHOLD) return // 아직 클릭 가능성 — scrollLeft 건드리지 않음
+      drag.current.dragStarted = true
+      el.setPointerCapture?.(e.pointerId)
+      el.style.cursor = 'grabbing'
+      el.style.userSelect = 'none'
+      auto.current.onDragStart() // 실제 드래그로 확정된 시점에만 auto motion 정지
+    }
+    el.scrollLeft = drag.current.startScroll - dx
     // loop 경계 보정 — startScroll 도 같이 이동시켜 무한 드래그 (auto tick 제거에 따라 여기서 처리)
     const la = auto.current.loopAt
     if (la > 0) {
@@ -819,6 +978,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
     const el = viewportRef.current
     if (!el || !drag.current.active) return
     drag.current.active = false
+    if (!drag.current.dragStarted) return // 실제 드래그가 시작된 적 없음(=클릭) — capture 없었으므로 복구도 없음
     el.releasePointerCapture?.(e.pointerId)
     el.style.cursor = 'grab'
     el.style.userSelect = ''
@@ -908,17 +1068,23 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
         >
           {/* PORTFOLIO(7개)를 그대로. seamless loop 를 위해 render layer 에서만 한 번 더 그리고,
               복제 세트(clone)는 스크린리더 중복 방지를 위해 aria-hidden 처리. */}
-          {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => (
-            <figure
+          {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => {
+            const isClone = i >= PORTFOLIO.length
+            return (
+            <button
               key={i}
+              type="button"
               data-card=""
-              aria-hidden={i >= PORTFOLIO.length ? true : undefined}
-              className="shrink-0 m-0"
+              aria-hidden={isClone ? true : undefined}
+              tabIndex={isClone ? -1 : 0}
+              onClick={() => navigate(`/portfolio/${item.portfolioIdx}`)}
+              className="shrink-0 m-0 block text-left cursor-pointer"
               style={{ width: 'clamp(330px, 40vw, 600px)' }}
             >
               {/* 큰 가로 이미지가 hero. hover transform 은 .pf-card(wrapper) 에, mediaScale 은 <img> 에
                   걸어 서로 다른 element 에서 처리 → 충돌 없음(hover 시 두 scale 이 자연히 곱해짐).
-                  아래 텍스트 영역은 wrapper 밖이라 움직이지 않는다. 무거운 카드 박스/보더 없음. */}
+                  아래 텍스트 영역은 wrapper 밖이라 움직이지 않는다. 무거운 카드 박스/보더 없음.
+                  button 내부라 figure/figcaption(sectioning content) 대신 div 사용(HTML content model). */}
               <div
                 data-card-img=""
                 className="pf-card overflow-hidden rounded-[10px] bg-black/[0.04]"
@@ -937,7 +1103,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
                   }}
                 />
               </div>
-              <figcaption className="mt-4 lg:mt-5">
+              <div className="mt-4 lg:mt-5">
                 <p className="text-[13px] font-medium tracking-[0.02em] text-black/45" style={fontKr}>{item.category}</p>
                 <h3
                   className="mt-1.5 text-black"
@@ -951,9 +1117,10 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
                 >
                   {item.description}
                 </p>
-              </figcaption>
-            </figure>
-          ))}
+              </div>
+            </button>
+            )
+          })}
         </div>
       </div>
     </section>
@@ -961,28 +1128,8 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
 }
 
 // ── Visual thumbnail helpers ──────────────────────────────────────────────────
-const SIZE_THUMBS: Record<string, { w: number; h: number }> = {
-  'A · 가로형': { w: 68, h: 50 },
-  'B · 세로형': { w: 48, h: 66 },
-  'C · 정사각': { w: 58, h: 58 },
-  'D · 와이드':  { w: 80, h: 44 },
-}
-function SizeSvg({ opt }: { opt: string }) {
-  const cfg = SIZE_THUMBS[opt] ?? { w: 64, h: 52 }
-  const bx = (80 - cfg.w) / 2, by = (80 - cfg.h) / 2
-  const dots = Math.min(6, Math.floor(cfg.w / 14))
-  return (
-    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-      <rect x={bx} y={by} width={cfg.w} height={cfg.h} rx="1" stroke="rgba(26,26,26,0.45)" strokeWidth="1" fill="rgba(245,242,234,0.9)" />
-      {Array.from({ length: dots }).map((_, i) => (
-        <circle key={i} cx={bx + 8 + i * ((cfg.w - 16) / Math.max(dots - 1, 1))} cy={by + 5} r="1.5" fill="rgba(26,26,26,0.3)" />
-      ))}
-      <line x1={bx + 6} y1={by + cfg.h * 0.42} x2={bx + cfg.w - 6} y2={by + cfg.h * 0.42} stroke="rgba(26,26,26,0.12)" strokeWidth="0.8" />
-      <line x1={bx + 6} y1={by + cfg.h * 0.6} x2={bx + cfg.w - 6} y2={by + cfg.h * 0.6} stroke="rgba(26,26,26,0.12)" strokeWidth="0.8" />
-    </svg>
-  )
-}
-
+// (사이즈는 더 이상 텍스트 옵션이 아니라 실제 규격을 보여주는 전용 SizeOptionRow를 쓰므로
+//  여기 썸네일이 필요 없다 — 내지 레이아웃(커스텀/하이앤드 전용)만 이 썸네일을 계속 쓴다.)
 const LAYOUT_THUMBS: Record<string, () => React.ReactNode> = {
   '2분할': () => (
     <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
@@ -1029,7 +1176,6 @@ function NeutralTile({ label }: { label: string }) {
 }
 
 function OptionThumbnail({ groupLabel, opt }: { groupLabel: string; opt: string }) {
-  if (groupLabel === '사이즈') return <SizeSvg opt={opt} />
   if (groupLabel === '내지 레이아웃') {
     const Fn = LAYOUT_THUMBS[opt]
     return Fn ? <>{Fn()}</> : <NeutralTile label={opt} />
@@ -1192,14 +1338,6 @@ function TierRow({ id, selected, onSelect }: { id: TierId; selected: boolean; on
   )
 }
 
-// 선택된 사이즈 옵션 → 대표 캘린더 미리보기 비율. (계산 state 아님, 표시 전용)
-const SIZE_RATIO: Record<string, [number, number]> = {
-  'A · 가로형': [4, 3],
-  'B · 세로형': [3, 4],
-  'C · 정사각': [1, 1],
-  'D · 와이드': [16, 9],
-}
-
 function CalendarPreview({ ratio }: { ratio: [number, number] }) {
   const [rw, rh] = ratio
   const base = 300
@@ -1249,82 +1387,119 @@ function CalendarPreview({ ratio }: { ratio: [number, number] }) {
   )
 }
 
-// 베이직 전용 '표지 스타일' 선택과 연동되는 예시 사진 2장 preview.
-// styleKey 가 바뀌면 짧게 fade-out 한 뒤, 새 이미지 2장이 아래에서 살짝 올라오며
-// fade-in 한다(두 번째 이미지가 첫 번째보다 살짝 늦게 등장). prefers-reduced-motion 이면
-// 애니메이션 없이 즉시 전환한다. 사진이 없는 슬롯은 중립 placeholder 로 대체된다.
-function CoverStylePreview({ styleKey }: { styleKey: CoverStyleKey | null }) {
-  const [displayKey, setDisplayKey] = useState<CoverStyleKey | null>(styleKey)
-  const [phase, setPhase] = useState<'in' | 'out'>('in')
-  const timerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (styleKey === displayKey) return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) {
-      setDisplayKey(styleKey)
-      setPhase('in')
-      return
-    }
-    setPhase('out')
-    if (timerRef.current) window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => {
-      setDisplayKey(styleKey)
-      setPhase('in')
-    }, 110)
-    return () => { if (timerRef.current) window.clearTimeout(timerRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [styleKey])
-
-  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
-  const images = displayKey ? COVER_STYLE_PREVIEWS[displayKey] : null
-
+// ── 표지 / 내지 실제 디자인 시안 선택 — image tile ──────────────────────────────
+// 텍스트 radio 대신 실제 이미지 1개를 고르는 방식(§Estimator 표지/내지 디자인). 이미지가
+// 아직 없으면(image: null) "이미지 준비중" placeholder 로 보여주고, 실제 asset이 들어오면
+// DesignOption.image 자리만 채우면 자동으로 실사진으로 바뀐다. 선택 상태는 기존 Estimator
+// selection convention(CFG_SEL_BORDER + CheckDisc)을 그대로 따른다.
+function DesignTile({ design, selected, onSelect }: { design: DesignOption; selected: boolean; onSelect: () => void }) {
   return (
-    <div className="mt-4">
-      <p className="mb-2.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>표지 스타일 예시</p>
-      {!images ? (
-        <div
-          className="flex items-center justify-center text-center"
-          style={{
-            aspectRatio: '16 / 7',
-            background: '#FAFAF8',
-            border: '1px solid rgba(26,26,26,0.10)',
-          }}
-        >
-          <span className="text-[12px] text-ink-light/40 px-4 break-keep" style={fontKr}>
-            표지 스타일을 선택하면 예시 이미지가 표시됩니다
+    <button
+      type="button"
+      onClick={onSelect}
+      className="text-left"
+      style={{
+        border: selected ? CFG_SEL_BORDER : CFG_REST_BORDER,
+        background: selected ? CFG_SEL_BG : '#ffffff',
+        transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+      }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+    >
+      {/* 실제 캘린더 시안은 대부분 가로형이라 3:2(가로) 비율로 보여준다 — object-contain으로 이미지
+          전체를 crop 없이 확인할 수 있게 한다(세로 카드 + object-cover였던 이전 레이아웃에서 변경). */}
+      <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 2', background: '#FBFCF8' }}>
+        {design.image ? (
+          <img src={design.image} alt={design.label} className="w-full h-full object-contain" draggable={false} />
+        ) : (
+          <span className="text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+        <span className="text-[12.5px] font-medium text-ink" style={CFG_KR}>{design.label}</span>
+        <CheckDisc on={selected} />
+      </div>
+    </button>
+  )
+}
+// 6개 시안 grid — 가로형 이미지 비교가 목적이라 2열×3행을 기본으로 쓴다(desktop 우측 column 폭
+// 기준으로 3열은 가로형 이미지가 지나치게 작아져 실측 후 2열로 확정, §완료보고 참고).
+function DesignGrid({ designs, selectedId, onSelect }: { designs: DesignOption[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {designs.map(d => (
+        <DesignTile key={d.id} design={d} selected={selectedId === d.id} onSelect={() => onSelect(d.id)} />
+      ))}
+    </div>
+  )
+}
+
+// ── 사이즈 행 — 실제 규격(mm) + 수량 제한 안내 + disabled 지원 ──────────────────
+// OptionRow와 시각 언어(같은 CFG_* 보더/배경)는 맞추되, 썸네일 대신 mm 라벨 + 수량 조건
+// sublabel을 보여주는 전용 행. 수량이 조건을 넘기면 클릭 자체를 막고(disabled) 이유를 노출한다.
+function SizeOptionRow({ opt, selected, disabled, onSelect }: {
+  opt: SizeOption; selected: boolean; disabled: boolean; onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      className="w-full flex items-center gap-4 text-left"
+      style={{
+        minHeight: '64px',
+        padding: '12px 16px',
+        borderRadius: '0px',
+        border: selected ? CFG_SEL_BORDER : CFG_REST_BORDER,
+        background: selected ? CFG_SEL_BG : '#ffffff',
+        opacity: disabled ? 0.42 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+      }}
+      onMouseEnter={e => { if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+      onMouseLeave={e => { if (!selected && !disabled) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+    >
+      <span className="flex-1 min-w-0 flex items-baseline gap-2 flex-wrap">
+        <span className="text-[14px] font-medium text-ink" style={CFG_KR}>{sizeLabel(opt)}</span>
+        {opt.maxQuantity && (
+          <span className="text-[11.5px] text-ink-light/50" style={CFG_KR}>
+            {disabled ? `${opt.maxQuantity}개 이하 제작 가능` : `${opt.maxQuantity}개 이하`}
           </span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {images.map((src, i) => (
-            <div
-              key={i}
-              className="overflow-hidden"
-              style={{
-                aspectRatio: '4 / 5',
-                background: '#FAFAF8',
-                border: '1px solid rgba(26,26,26,0.10)',
-                opacity: phase === 'in' ? 1 : 0,
-                transform: phase === 'in' ? 'translateY(0)' : 'translateY(8px)',
-                transition: phase === 'in'
-                  ? `opacity 260ms ${CFG_EASE} ${i * 60}ms, transform 260ms ${CFG_EASE} ${i * 60}ms`
-                  : `opacity 110ms ${CFG_EASE}, transform 110ms ${CFG_EASE}`,
-              }}
-            >
-              {src ? (
-                <img src={src} alt="" className="w-full h-full object-cover" draggable={false} />
+        )}
+      </span>
+      <CheckDisc on={selected} />
+    </button>
+  )
+}
+
+// 좌측 preview 하단 — 선택한 표지/내지 디자인을 이미지+이름으로 확인(§15). 실시간 합성은 하지
+// 않고 두 이미지를 나란히 보여주는 최소 구현.
+function SelectedDesignsPreview({ cover, inner }: { cover: DesignOption | null; inner: DesignOption | null }) {
+  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+  if (!cover && !inner) return null
+  const slots: { label: string; design: DesignOption | null }[] = [
+    { label: '표지', design: cover },
+    { label: '내지', design: inner },
+  ]
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3">
+      {slots.map(s => (
+        <div key={s.label}>
+          <p className="mb-1.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>선택한 {s.label}</p>
+          <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
+            {s.design ? (
+              s.design.image ? (
+                <img src={s.design.image} alt={s.design.label} className="w-full h-full object-cover" draggable={false} />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-[11.5px] text-ink-light/40" style={fontKr}>
-                    예시 이미지 {String(i + 1).padStart(2, '0')}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
+                <span className="text-[11px] text-ink-light/40 px-2 text-center" style={fontKr}>이미지 준비중</span>
+              )
+            ) : (
+              <span className="text-[11.5px] text-ink-light/35 px-2 text-center" style={fontKr}>미선택</span>
+            )}
+          </div>
+          {s.design && <p className="mt-1 text-[12px] font-medium text-ink" style={fontKr}>{s.design.label}</p>}
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -1333,18 +1508,36 @@ function CoverStylePreview({ styleKey }: { styleKey: CoverStyleKey | null }) {
 // UX: Sincerely configurator (좌 preview / 우 progressive accordion / 하단 요약).
 // Visual: Touchgraphic (white·black 중심, hairline rule, 최소 radius, 제한적 accent).
 // 가격 데이터·계산식은 TIER_DATA / tierBaseTotal / wonFmt / total 계산 그대로 사용.
-function EstimatorInline({ onConsult }: { onConsult: () => void }) {
+function EstimatorInline({ onConsult, initialSnapshot }: {
+  onConsult: (snapshot: EstimateSnapshot) => void
+  // 상담 페이지의 "견적 다시 수정하기"로 돌아왔을 때 이전 선택값을 복원하기 위한 값(§AGENTS: 가격 로직 불변,
+  // 여기서는 초기 state 값만 snapshot에서 가져온다).
+  initialSnapshot?: EstimateSnapshot | null
+}) {
   // ── 가격 계산 state (동결) ──
-  const [tier, setTier] = useState<TierId>('template')
-  const [optIdx, setOptIdx] = useState<Record<string, Record<string, number | null>>>({})
+  const [tier, setTier] = useState<TierId>(() => initialSnapshot?.tier ?? 'template')
+  const [optIdx, setOptIdx] = useState<Record<string, Record<string, number | null>>>(() => initialSnapshot?.optIdx ?? {})
+
+  // ── 베이직 전용 — 표지/내지 실제 디자인 선택 state ──
+  const [coverFamilyId, setCoverFamilyId] = useState<string | null>(() => initialSnapshot?.coverFamilyId ?? null)
+  const [coverDesignId, setCoverDesignId] = useState<string | null>(() => initialSnapshot?.coverDesignId ?? null)
+  const [innerDesignId, setInnerDesignId] = useState<string | null>(() => initialSnapshot?.innerDesignId ?? null)
+  // 사이즈/수량 — 등급 공통(베이직·커스텀·하이앤드 모두 같은 기성 사이즈 정책을 공유한다).
+  const [sizeId, setSizeId] = useState<string | null>(() => initialSnapshot?.sizeId ?? null)
+  const [customSizeText, setCustomSizeText] = useState(() => initialSnapshot?.customSizeText ?? '')
+  const [quantity, setQuantity] = useState<number | null>(() => initialSnapshot?.quantity ?? null)
+  const [sizeWarning, setSizeWarning] = useState<string | null>(null)
+  // 베이직 전용 — 종이 사양(더 이상 "미정" 없음, 반드시 하나를 고른다)
+  const [paperSpecId, setPaperSpecId] = useState<PaperSpecId | null>(() => initialSnapshot?.paperSpecId ?? null)
 
   // ── configurator UI state (표시 전용, 계산과 분리) ──
   const [openStep, setOpenStep] = useState<string | null>('tier')
   const stepRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const d = TIER_DATA[tier]
+  const isBasic = tier === 'template'
 
-  // 견적 합계 = 등급 breakdown 합 (옵션·보조 선택은 금액에 반영되지 않는다).
+  // 견적 합계 = 등급 breakdown 합 (옵션·디자인 시안·사이즈·수량 선택은 금액에 반영되지 않는다).
   const total = d.breakdown.reduce((a, b) => a + b.value, 0)
   const animatedTotal = useAnimatedNumber(total)
 
@@ -1356,16 +1549,43 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
 
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '.')
 
-  // ── 공통 numbered step: 01 제작 등급 → 02 사이즈 → 03 내지 레이아웃 (모든 tier 동일) ──
-  // 표지 스타일은 numbered step 이 아닌 베이직 전용 보조 옵션으로만 노출한다.
-  const SUPPLEMENTARY_GROUPS = ['표지 스타일']
-  type StepKind = 'tier' | 'option'
+  // 수량이 바뀌어 이미 고른 사이즈의 최대 제작 수량(280×125·96×121 = 300개)을 넘기면
+  // 해당 사이즈 선택을 해제하고 안내 문구를 보여준다. sizeId를 의존성에서 뺀 건 해제 직후
+  // 재실행되면서 경고가 바로 지워지는 걸 막기 위함 — functional update로 최신값만 읽는다.
+  useEffect(() => {
+    setSizeId(prevId => {
+      if (!prevId) return prevId
+      const opt = d.sizes.find(s => s.id === prevId)
+      if (opt?.maxQuantity && quantity !== null && quantity > opt.maxQuantity) {
+        setSizeWarning(`선택하신 예상 수량(${quantity.toLocaleString()}개)은 ${sizeLabel(opt)}의 최대 제작 수량(${opt.maxQuantity}개)을 초과해 선택이 해제되었습니다. 사이즈를 다시 선택해주세요.`)
+        return null
+      }
+      return prevId
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantity, tier])
+
+  // ── 베이직: 01 제작등급 → 02 표지 스타일 → 03 내지 디자인 → 04 사이즈 → 05 종이 사양 → 06 예상 수량
+  // 커스텀/하이앤드: 표지·내지를 맞춤 디자인하므로 내지 디자인/내지 레이아웃 선택 자체가 없다 —
+  // 01 제작등급 → 02 사이즈 → 03 예상 수량. step 번호는 배열 index(i+1)로 매겨지므로 tier마다
+  // 배열 길이가 달라도 별도 재배치 로직 없이 자동으로 이어진다.
+  type StepKind = 'tier' | 'cover' | 'inner' | 'size' | 'paper' | 'quantity' | 'option'
   type StepDef = { key: string; label: string; kind: StepKind; group?: string }
-  const optionGroups = d.options ? Object.keys(d.options).filter(g => !SUPPLEMENTARY_GROUPS.includes(g)) : []
-  const steps: StepDef[] = [
-    { key: 'tier', label: '제작 등급', kind: 'tier' },
-    ...optionGroups.map(g => ({ key: `option:${g}`, label: g, kind: 'option' as StepKind, group: g })),
-  ]
+  const steps: StepDef[] = isBasic
+    ? [
+        { key: 'tier', label: '제작 등급', kind: 'tier' },
+        { key: 'cover', label: '표지 스타일 · 1개 선택', kind: 'cover' },
+        { key: 'inner', label: '내지 디자인 · 1개 선택', kind: 'inner' },
+        { key: 'size', label: '사이즈', kind: 'size' },
+        { key: 'paper', label: '종이 사양', kind: 'paper' },
+        { key: 'quantity', label: '예상 수량', kind: 'quantity' },
+      ]
+    : [
+        { key: 'tier', label: '제작 등급', kind: 'tier' },
+        { key: 'size', label: '사이즈', kind: 'size' },
+        ...(d.options ? Object.keys(d.options).map(g => ({ key: `option:${g}`, label: g, kind: 'option' as StepKind, group: g })) : []),
+        { key: 'quantity', label: '예상 수량', kind: 'quantity' },
+      ]
 
   function openAndScroll(key: string | null) {
     setOpenStep(key)
@@ -1386,11 +1606,7 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
   function handleTier(id: TierId) {
     if (id === tier) { advanceFrom('tier'); return }
     setTier(id)
-    const nd = TIER_DATA[id]
-    const firstGroup = nd.options
-      ? Object.keys(nd.options).filter(g => !SUPPLEMENTARY_GROUPS.includes(g))[0]
-      : null
-    openAndScroll(firstGroup ? `option:${firstGroup}` : null)
+    openAndScroll(id === 'template' ? 'cover' : 'size')
   }
 
   function handleOption(group: string, i: number) {
@@ -1398,42 +1614,107 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
     advanceFrom(`option:${group}`)
   }
 
-  // 베이직 전용 보조 옵션 — 표지 스타일. numbered step 이 아니므로 다음 단계로 자동 이동하지 않는다.
-  const coverStyles = d.options?.['표지 스타일'] ?? null
-  function handleCoverStyle(i: number) {
-    setOptIdx(prev => ({ ...prev, [tier]: { ...(prev[tier] ?? {}), ['표지 스타일']: i } }))
+  // 표지 계열 선택 — 계열이 바뀌면 이전 계열의 시안 선택은 더 이상 유효하지 않으므로 초기화.
+  // 다음 단계로는 시안까지 고른 뒤(handleCoverDesign)에만 넘어간다.
+  function handleCoverFamily(familyId: string) {
+    setCoverFamilyId(prev => (prev === familyId ? prev : familyId))
+    setCoverDesignId(null)
   }
-  // 왼쪽 preview 영역과 연동되는 key. 별도 state 없이 기존 '표지 스타일' 선택값에서만 파생한다.
-  const coverStyleSelectedLabel = (() => {
-    if (!coverStyles) return null
-    const ix = getOptIdx('표지 스타일')
-    return ix !== null ? coverStyles[ix] : null
-  })()
-  const coverStyleKey: CoverStyleKey | null = coverStyleSelectedLabel
-    ? (COVER_STYLE_TO_KEY[coverStyleSelectedLabel] ?? null)
-    : null
+  function handleCoverDesign(designId: string) {
+    setCoverDesignId(designId)
+    advanceFrom('cover')
+  }
+  function handleInnerDesign(designId: string) {
+    setInnerDesignId(designId)
+    advanceFrom('inner')
+  }
+  function handleSize(id: string) {
+    setSizeId(id)
+    setSizeWarning(null)
+    advanceFrom('size')
+  }
+  function handlePaper(id: PaperSpecId) {
+    setPaperSpecId(id)
+    advanceFrom('paper')
+  }
 
-  // 베이직 전용 보조 옵션 — 종이 사양. 표지 스타일과 동일하게 numbered step 이 아니며,
-  // 가격에는 반영되지 않는 consultation 전달용 선택값이다.
-  const [paperType, setPaperType] = useState<PaperType>('undecided')
+  const selectedCoverFamily = COVER_DESIGN_FAMILIES.find(f => f.id === coverFamilyId) ?? null
+  const selectedCoverDesign = selectedCoverFamily?.designs.find(x => x.id === coverDesignId) ?? null
+  const selectedInnerDesign = INNER_DESIGNS.find(x => x.id === innerDesignId) ?? null
+  const selectedSize = d.sizes.find(s => s.id === sizeId) ?? null
+  const selectedPaperLabel = paperSpecId ? (PAPER_SPEC_OPTIONS.find(p => p.id === paperSpecId)?.label ?? null) : null
 
   function stepState(s: StepDef): { done: boolean; selectedLabel: string | null; hint: string; count: string } {
     if (s.kind === 'tier') return { done: true, selectedLabel: d.name, hint: '', count: '1/1' }
+    if (s.kind === 'cover') {
+      const sel = selectedCoverDesign && selectedCoverFamily ? `${selectedCoverFamily.name} · ${selectedCoverDesign.label}` : null
+      return { done: !!sel, selectedLabel: sel, hint: '표지 계열과 시안을 선택해주세요', count: sel ? '1/1' : '0/1' }
+    }
+    if (s.kind === 'inner') {
+      return { done: !!selectedInnerDesign, selectedLabel: selectedInnerDesign?.label ?? null, hint: '내지 디자인을 선택해주세요', count: selectedInnerDesign ? '1/1' : '0/1' }
+    }
+    if (s.kind === 'size') {
+      const sel = selectedSize ? sizeLabel(selectedSize) : null
+      return { done: !!sel, selectedLabel: sel, hint: '사이즈를 선택해주세요', count: sel ? '1/1' : '0/1' }
+    }
+    if (s.kind === 'paper') {
+      return { done: !!selectedPaperLabel, selectedLabel: selectedPaperLabel, hint: '종이 사양을 선택해주세요', count: selectedPaperLabel ? '1/1' : '0/1' }
+    }
+    if (s.kind === 'quantity') {
+      const sel = quantity ? `${quantity.toLocaleString()}개` : null
+      return { done: !!sel, selectedLabel: sel, hint: '예상 수량을 입력해주세요 (선택)', count: sel ? '1/1' : '0/1' }
+    }
     const ix = getOptIdx(s.group!)
     const sel = ix !== null && d.options ? d.options[s.group!][ix] : null
     return { done: sel !== null, selectedLabel: sel, hint: '옵션을 선택해주세요', count: sel !== null ? '1/1' : '0/1' }
   }
 
   // ── preview / summary 표시값 (기존 state에서만 파생) ──
-  const sizeIdx = d.options && d.options['사이즈'] ? getOptIdx('사이즈') : null
-  const sizeLabel = sizeIdx !== null && d.options ? d.options['사이즈'][sizeIdx] : null
-  const previewRatio: [number, number] = (sizeLabel && SIZE_RATIO[sizeLabel]) || [4, 3]
+  const previewRatio: [number, number] = selectedSize && !selectedSize.custom ? [selectedSize.w, selectedSize.h] : [4, 3]
 
   const summaryChips: string[] = []
-  if (d.options) {
+  if (isBasic) {
+    if (selectedCoverFamily && selectedCoverDesign) summaryChips.push(`표지 · ${selectedCoverFamily.name} ${selectedCoverDesign.label}`)
+    if (selectedInnerDesign) summaryChips.push(`내지 · ${selectedInnerDesign.label}`)
+  } else if (d.options) {
     for (const g of Object.keys(d.options)) {
       const ix = getOptIdx(g)
       if (ix !== null) summaryChips.push(d.options[g][ix])
+    }
+  }
+  if (selectedSize) summaryChips.push(sizeLabel(selectedSize))
+  if (isBasic && selectedPaperLabel) summaryChips.push(selectedPaperLabel)
+  if (quantity) summaryChips.push(`${quantity.toLocaleString()}개`)
+
+  // "이 견적으로 상담 신청하기" 클릭 시점의 값을 고정한다. 텍스트 옵션(내지 레이아웃)은 커스텀/
+  // 하이앤드에만 있고, 표지/내지 디자인·종이 사양은 베이직에만 있다 — 각 필드는 해당 없으면 null.
+  function buildEstimateSnapshot(): EstimateSnapshot {
+    const options: { group: string; label: string }[] = []
+    if (!isBasic && d.options) {
+      for (const g of Object.keys(d.options)) {
+        const ix = getOptIdx(g)
+        if (ix !== null) options.push({ group: g, label: d.options[g][ix] })
+      }
+    }
+    return {
+      tier, optIdx,
+      coverFamilyId, coverDesignId, innerDesignId,
+      paperSpecId, sizeId, customSizeText, quantity,
+      resolved: {
+        tierName: d.name,
+        subtitle: d.subtitle,
+        options,
+        coverFamily: isBasic ? (selectedCoverFamily?.name ?? null) : null,
+        coverDesignLabel: isBasic ? (selectedCoverDesign?.label ?? null) : null,
+        innerDesignLabel: isBasic ? (selectedInnerDesign?.label ?? null) : null,
+        size: selectedSize ? sizeLabel(selectedSize) : null,
+        customSizeText: selectedSize?.custom ? (customSizeText || null) : null,
+        paperSpec: isBasic ? selectedPaperLabel : null,
+        quantity,
+        fixedSpec: d.fixedSpec ?? [],
+        total,
+      },
+      createdAt: new Date().toISOString(),
     }
   }
 
@@ -1491,12 +1772,12 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-ink-light/55" style={fontKr}>{d.name}</p>
               <p className="mt-0.5 text-[13px] text-ink truncate" style={fontKr}>
-                {sizeLabel ?? (d.options ? '사이즈 미선택' : d.subtitle)}
+                {selectedSize ? sizeLabel(selectedSize) : '사이즈 미선택'}
               </p>
             </div>
           </div>
 
-          {coverStyles && <CoverStylePreview styleKey={coverStyleKey} />}
+          {isBasic && <SelectedDesignsPreview cover={selectedCoverDesign} inner={selectedInnerDesign} />}
         </div>
 
         {/* 우: progressive accordion */}
@@ -1526,6 +1807,122 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
                     </div>
                   )}
 
+                  {s.kind === 'cover' && (
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-wrap gap-3">
+                        {COVER_DESIGN_FAMILIES.map(f => {
+                          const on = coverFamilyId === f.id
+                          return (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => handleCoverFamily(f.id)}
+                              className="flex items-center gap-2.5 text-left"
+                              style={{
+                                padding: '13px 18px',
+                                border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                                background: on ? CFG_SEL_BG : '#ffffff',
+                                transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                              }}
+                              onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                              onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                            >
+                              <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{f.name}</span>
+                              <CheckDisc on={on} />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {selectedCoverFamily ? (
+                        <DesignGrid designs={selectedCoverFamily.designs} selectedId={coverDesignId} onSelect={handleCoverDesign} />
+                      ) : (
+                        <p className="text-[12.5px] text-ink-light/50 leading-[1.6]" style={fontKr}>표지 계열을 먼저 선택하면 실제 시안 6개가 표시됩니다.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {s.kind === 'inner' && (
+                    <DesignGrid designs={INNER_DESIGNS} selectedId={innerDesignId} onSelect={handleInnerDesign} />
+                  )}
+
+                  {s.kind === 'size' && (
+                    <div className="flex flex-col gap-2">
+                      {d.sizes.map(opt => {
+                        const disabled = sizeQuantityExceeded(opt, quantity)
+                        return (
+                          <SizeOptionRow key={opt.id} opt={opt} selected={sizeId === opt.id} disabled={disabled} onSelect={() => handleSize(opt.id)} />
+                        )
+                      })}
+                      {sizeWarning && (
+                        <p className="text-[12px] text-[#B8462B] leading-[1.6] break-keep" style={fontKr}>{sizeWarning}</p>
+                      )}
+                      {selectedSize?.custom && (
+                        <div className="mt-2 p-4" style={{ background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
+                          <p className="text-[12.5px] text-ink-light/70 leading-[1.6] mb-3" style={fontKr}>
+                            별도 사이즈는 가격을 자동으로 계산하지 않습니다. 희망 규격을 남겨주시면 상담 시 별도 견적을 안내해 드립니다.
+                          </p>
+                          <label className="block text-[11px] font-medium text-ink-light/55 mb-1.5" style={fontKr}>희망 사이즈 (선택)</label>
+                          <input
+                            type="text"
+                            value={customSizeText}
+                            onChange={e => setCustomSizeText(e.target.value)}
+                            placeholder="예: 가로 300mm × 세로 200mm"
+                            className="w-full bg-white px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-light/30 focus:outline-none"
+                            style={{ ...fontKr, border: '1px solid rgba(26,26,26,0.15)' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {s.kind === 'paper' && (
+                    <div className="flex flex-wrap gap-3">
+                      {PAPER_SPEC_OPTIONS.map(({ id, label }) => {
+                        const on = paperSpecId === id
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => handlePaper(id)}
+                            className="flex items-center gap-2.5 text-left"
+                            style={{
+                              padding: '13px 18px',
+                              border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                              background: on ? CFG_SEL_BG : '#ffffff',
+                              transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                            }}
+                            onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                            onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                          >
+                            <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{label}</span>
+                            <CheckDisc on={on} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {s.kind === 'quantity' && (
+                    <div className="max-w-[280px]">
+                      <input
+                        type="number"
+                        min={1}
+                        inputMode="numeric"
+                        value={quantity ?? ''}
+                        onChange={e => {
+                          const v = e.target.value
+                          setQuantity(v === '' ? null : Math.max(0, parseInt(v, 10) || 0))
+                        }}
+                        placeholder="예: 500"
+                        className="w-full bg-white px-3 py-2.5 text-[14px] text-ink placeholder:text-ink-light/30 focus:outline-none"
+                        style={{ ...fontKr, border: '1px solid rgba(26,26,26,0.18)' }}
+                      />
+                      <p className="mt-2 text-[11.5px] text-ink-light/50 leading-[1.6]" style={fontKr}>
+                        280 × 125 mm · 96 × 121 mm 사이즈는 300개 이하에서만 제작 가능합니다.
+                      </p>
+                    </div>
+                  )}
+
                   {s.kind === 'option' && d.options && (
                     <div className="flex flex-col gap-2">
                       {d.options[s.group!].map((opt, oi) => (
@@ -1544,76 +1941,19 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
             })}
           </div>
 
-          {/* 베이직 전용 보조 옵션 — 표지 스타일 / 종이 사양. numbered step(01·02·03)보다 한 단계 낮은 위계.
-              커스텀 / 하이앤드에는 '표지 스타일' 옵션이 없으므로 이 블록 자체가 렌더되지 않는다.
-              데스크톱에서는 두 그룹을 좌우로, 좁은 화면에서는 세로로 쌓는다. */}
-          {coverStyles && (
-            <div className="mt-8 pt-8 border-t border-ink/15 flex flex-col lg:flex-row gap-8 lg:gap-16">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 mb-5">
-                  <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 표지 스타일</span>
-                  <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {coverStyles.map((opt, oi) => {
-                    const on = getOptIdx('표지 스타일') === oi
-                    return (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => handleCoverStyle(oi)}
-                        className="flex items-center gap-2.5 text-left"
-                        style={{
-                          padding: '15px 20px',
-                          borderRadius: '0px',
-                          border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
-                          background: on ? CFG_SEL_BG : '#ffffff',
-                          transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-                        }}
-                        onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
-                        onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
-                      >
-                        <span className="text-[13px] font-medium text-ink break-keep" style={fontKr}>{opt}</span>
-                        <CheckDisc on={on} />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 mb-5">
-                  <span className="text-[11px] font-bold text-ink" style={fontKr}>추가 선택 · 종이 사양</span>
-                  <span className="text-[10.5px] text-ink-light/45" style={fontKr}>베이직 전용</span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {PAPER_TYPE_OPTIONS.map(({ id, label }) => {
-                    const on = paperType === id
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setPaperType(id)}
-                        className="flex items-center gap-2.5 text-left"
-                        style={{
-                          padding: '15px 20px',
-                          borderRadius: '0px',
-                          border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
-                          background: on ? CFG_SEL_BG : '#ffffff',
-                          transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-                        }}
-                        onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
-                        onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
-                      >
-                        <span className="text-[13px] font-medium text-ink break-keep" style={fontKr}>{label}</span>
-                        <CheckDisc on={on} />
-                      </button>
-                    )
-                  })}
-                </div>
+          {/* 베이직 전용 — 고정 제작 사양 정보 블록. 선택 불가능한 항목(삼각대 색상·링 종류)을
+              disabled 컨트롤로 늘어놓지 않고, 고정값임을 안내 텍스트로만 보여준다(§7). */}
+          {d.fixedSpec && (
+            <div className="mt-10 pt-8 border-t border-ink/15">
+              <span className="text-[11px] font-bold text-ink-light/55 block mb-3" style={fontKr}>{d.name} 기본 제작 사양</span>
+              <div className="flex flex-wrap gap-x-6 gap-y-2">
+                {d.fixedSpec.map(spec => (
+                  <span key={spec} className="text-[13.5px] font-medium text-ink" style={fontKr}>{spec}</span>
+                ))}
               </div>
             </div>
           )}
+
 
           {/* 진행 조건 — numbered row + divider 로 정돈된 정보 영역 (문구 변경 없음) */}
           <div className="mt-10 pt-8 border-t border-ink/15">
@@ -1652,7 +1992,7 @@ function EstimatorInline({ onConsult }: { onConsult: () => void }) {
             </div>
 
             <button
-              onClick={onConsult}
+              onClick={() => onConsult(buildEstimateSnapshot())}
               className="w-full lg:w-auto inline-flex items-center justify-center px-8 lg:px-10 py-4 lg:py-[17px] text-white transition-opacity hover:opacity-90"
               style={{ borderRadius: '999px', background: '#1A1A1A', fontSize: 'clamp(15px, 1.4vw, 18px)', fontWeight: 700, ...fontKr }}
             >
@@ -1797,8 +2137,8 @@ const CLIENTS: ClientLogo[] = [
 // 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
 // 출판물은 원본의 대분류명이며, 뒷면에 있는 세부품명·유효기간은 여기서 추정하지 않는다.
 const CORE_CERTIFICATIONS = [
-  { src: certIndustrial, label: '산업디자인전문회사', scope: '(종합)', alt: '산업디자인전문회사 신고확인증 — 전문분야 종합', description: '시각·제품·포장디자인', note: '' },
-  { src: certWomenOwned, label: '여성기업확인서', scope: '', alt: '여성기업 확인서', description: '추정가격 5천만원 이하\n1인 견적 수의계약 가능 범위', note: '관련 법령 및 계약 조건에 따름' },
+  { src: certIndustrial, label: '산업디자인전문회사', scope: '(종합)', alt: '산업디자인전문회사 신고확인증 — 전문분야 종합' },
+  { src: certWomenOwned, label: '여성기업확인서', scope: '', alt: '여성기업 확인서' },
 ]
 const PRODUCTION_CERTIFICATIONS = [
   { src: certCalendar, label: '달력' },
@@ -1848,8 +2188,6 @@ function CertificationSection() {
                       <span>{c.label}</span>
                       {c.scope && <span className="font-semibold text-black/50">{c.scope}</span>}
                     </h4>
-                    <p className="mt-2 text-[12px] lg:text-[13px] leading-[1.65] text-black/70 break-keep whitespace-pre-line">{c.description}</p>
-                    {c.note && <p className="mt-1 text-[11px] leading-[1.6] text-black/55 break-keep">{c.note}</p>}
                   </figcaption>
                 </figure>
               ))}
@@ -1930,11 +2268,14 @@ function Clients() {
 // layout-master.png처럼 페이지에서 크게 차지하는 넓은 가로 밴드.
 // 계산 UI 자체(EstimatorInline)와 가격 데이터/계산식은 그대로 두고,
 // 바깥 wrapper의 폭·여백·배경만 조정한다.
-function EstimatorSection({ onConsult }: { onConsult: () => void }) {
+function EstimatorSection({ onConsult, initialSnapshot }: {
+  onConsult: (snapshot: EstimateSnapshot) => void
+  initialSnapshot?: EstimateSnapshot | null
+}) {
   return (
     <section id="estimator" className="bg-white u-section-sm" style={{ scrollMarginTop: '56px' }}>
       <div className={SHELL}>
-        <EstimatorInline onConsult={onConsult} />
+        <EstimatorInline onConsult={onConsult} initialSnapshot={initialSnapshot} />
       </div>
     </section>
   )
@@ -2861,8 +3202,9 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
     el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
   }
 
-  // 중앙 content container — 레퍼런스처럼 화면 양끝에 붙이지 않고 1440 max 로 가둔다.
-  const PF_CONTAINER = 'mx-auto w-full max-w-[1440px] px-6 md:px-8'
+  // 중앙 content container — 레퍼런스처럼 화면 양끝에 붙이지 않되, 좌우 여백을 줄이고 grid
+  // thumbnail이 더 크게 보이도록 1440 → 1520 max로 넓히고 좌우 padding도 축소했다.
+  const PF_CONTAINER = 'mx-auto w-full max-w-[1520px] px-5 md:px-6'
 
   return (
     <div className="min-h-screen bg-white">
@@ -2905,78 +3247,85 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
             </h1>
 
             <p
-              className="mt-6 lg:mt-0 lg:absolute lg:right-0 lg:bottom-0 lg:max-w-[360px] lg:text-right text-black/60 break-keep"
-              style={{ ...fontKr, fontSize: 'clamp(14px, 1.05vw, 16px)', lineHeight: 1.75 }}
+              className="mt-6 lg:mt-0 lg:absolute lg:right-0 lg:bottom-0 lg:max-w-[380px] lg:text-right text-black/85 break-keep"
+              style={{ ...fontKr, fontWeight: 500, fontSize: 'clamp(14px, 1.05vw, 16px)', lineHeight: 1.6, letterSpacing: '-0.01em' }}
             >
               달력으로 브랜드의 시간을 기록합니다.<br />
               기업과 기관의 이야기를 한 장면에 담습니다.
             </p>
           </div>
 
-          {/* full-width thin rule — intro 와 filter/grid 영역을 명확히 분리 */}
+          {/* full-width thin rule — category+CTA row 와 결합하지 않고 좌우 끝까지 끊김 없이 유지. */}
           <div className="mt-8 lg:mt-10 border-t border-black" />
+        </div>
+      </section>
 
-          {/* rule 아래 중앙 speech-bubble button → Landing 의 EstimatorSection (Header 견적 계산하기와 동일 helper) */}
-          <div className="flex justify-center">
+      {/* ── Category filter + 견적 계산기 CTA — 한 row ──
+          filter 3개(전체/기업/기관)는 기존 black active/white inactive 유지. 그 오른쪽에 견적 계산기
+          CTA를 별도 gap으로 배치해 "같은 row/composition"이면서도 카테고리와는 다른 기능임을 형태로
+          구분한다. CTA 스타일은 touchagraphic.com 실제 포트폴리오 페이지의 hover callout
+          ("OOO 바로가기 →": white bg / 0.8px black outline / rounded ~9px / 하단 speech-bubble
+          notch)을 그대로 재현 — filter의 solid pill과 뚜렷이 다른 outline 형태라 한눈에 별개
+          action으로 읽힌다. mobile 에서는 같은 flex-wrap row가 좁아지면 CTA가 자연스럽게 다음 줄로
+          내려가 전체/기업/기관 한 줄 유지 + CTA는 그 아래, 라는 요구를 별도 breakpoint 분기 없이 만족한다. */}
+      <section className="bg-white">
+        <div className={PF_CONTAINER}>
+          <nav aria-label="포트폴리오 카테고리" className="mt-7 lg:mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+            <div className="flex flex-wrap justify-center gap-2 lg:gap-3">
+              {PORTFOLIO_FILTERS.map(f => {
+                const on = filter === f
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFilter(f)}
+                    aria-current={on ? 'true' : undefined}
+                    className="min-w-[104px] lg:min-w-[136px] h-[40px] lg:h-[43px] px-4 lg:px-6 rounded-full text-[14px] lg:text-[15px] transition-colors"
+                    style={{
+                      ...fontKr,
+                      fontWeight: 600,
+                      background: on ? '#1A1A1A' : '#FFFFFF',
+                      color: on ? '#FFFFFF' : '#1A1A1A',
+                      border: on ? '1px solid #1A1A1A' : '1px solid rgba(0,0,0,0.16)',
+                    }}
+                  >
+                    {f}
+                  </button>
+                )
+              })}
+            </div>
+
             <button
               type="button"
               onClick={() => navigate('/', { scrollTo: 'estimator-scroll-target' })}
-              className="relative mt-3 inline-flex items-center gap-1.5 rounded-[9px] border border-black bg-white px-6 py-3 text-black transition-colors hover:bg-black hover:text-white"
+              className="relative inline-flex h-[40px] items-center gap-1.5 rounded-[8px] border border-black bg-white px-5 text-black transition-colors hover:bg-black/[0.04]"
               style={{ ...fontKr, fontSize: '14px', fontWeight: 500 }}
             >
               견적 계산기 바로가기
               <span aria-hidden>→</span>
-              {/* 아래를 향하는 speech-bubble notch (검은 테두리 + 흰 채움) */}
+              {/* 아래를 향하는 speech-bubble notch (검은 테두리 + 흰 채움) — touchagraphic.com 원본 재현 */}
               <span
                 aria-hidden
                 className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
-                style={{ top: '100%', borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '7px solid #000' }}
+                style={{ top: '100%', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #000' }}
               />
               <span
                 aria-hidden
                 className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
-                style={{ top: 'calc(100% - 1.5px)', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #fff' }}
+                style={{ top: 'calc(100% - 1.5px)', borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #fff' }}
               />
             </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Filter ── grid 위 중앙. pill 형태(활성 dark bg + white / 비활성 white + thin gray border).
-          데이터에 기업/기관 분류가 없어 표시 전용이며, 즉시 client-side filtering 동작은 현재와 동일하게 유지한다. */}
-      <section className="bg-white">
-        <div className={PF_CONTAINER}>
-          <div className="mt-12 lg:mt-16 flex flex-wrap justify-center gap-2.5">
-            {PORTFOLIO_FILTERS.map(f => {
-              const on = filter === f
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className="h-[42px] px-6 rounded-full text-[14px] font-semibold leading-none transition-colors"
-                  style={{
-                    ...fontKr,
-                    background: on ? '#1A1A1A' : '#FFFFFF',
-                    color: on ? '#FFFFFF' : '#333333',
-                    border: on ? '1px solid #1A1A1A' : '1px solid rgba(0,0,0,0.18)',
-                  }}
-                >
-                  {f}
-                </button>
-              )
-            })}
-          </div>
+          </nav>
         </div>
       </section>
 
       {/* ── Portfolio grid ── desktop 3 / tablet 2 / mobile 1 열, 중앙 container 안(화면 양끝에 붙지 않음).
           thumbnail 은 3:2(= 실제 이미지 공통 비율) wrapper + object-contain + black bg 로 절대 crop 되지 않는다. */}
-      <section className="bg-white pt-10 lg:pt-14 pb-[100px] lg:pb-[150px]">
+      <section className="bg-white pt-8 lg:pt-10 pb-[100px] lg:pb-[150px]">
         <div className={PF_CONTAINER}>
           <div
             id="portfolio-grid"
-            className="scroll-mt-[88px] lg:scroll-mt-[112px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-12 lg:gap-y-[60px]"
+            className="scroll-mt-[88px] lg:scroll-mt-[112px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-12 lg:gap-y-[60px]"
           >
             {items.map((item, index) => {
               const accent = PF_ACCENTS[index % PF_ACCENTS.length]
@@ -3192,23 +3541,12 @@ function PortfolioDetailPage({ idx, navigate }: { idx: number; navigate: (path: 
   )
 }
 
-// ── 문의 페이지 (/inquiry) ───────────────────────────────────────────────────────
-// 기존 Touchgraphic 문의 페이지(touchagraphic.com/page/inquiry.html)의 layout·spacing·
-// form architecture를 재현: 큰 introduction + 얇은 divider, 번호 붙은 section, 사각형
-// selectable box(01), gray 배경 input/select(02·03), 라벨 옆 magenta dot(필수 표시),
-// 개인정보 동의 체크박스 + outline 화살표 submit 버튼. V2 Header는 그대로 재사용.
-// 기존 Touchgraphic 문의 페이지의 04(프로젝트 상세 타입 accordion)는 이 페이지에 만들지 않는다.
-// 실제 전송 백엔드는 아직 없음 — handleSubmit 의 TODO 참고(touchagraphic.com의 endpoint를 추측해
-// 연결하지 않는다). 여기서는 plan 선택 state만 새로 만들고 Estimator 가격 데이터/로직은 참조하지 않는다.
-type InquiryPlanId = 'basic' | 'custom' | 'highend'
-const INQUIRY_PLANS: { id: InquiryPlanId; name: string }[] = [
-  { id: 'basic',   name: '베이직 (실속형)' },
-  { id: 'custom',  name: '커스텀 (맞춤형)' },
-  { id: 'highend', name: '하이앤드 (기획형)' },
-]
-// 유입경로는 기존에 정의된 옵션이 없어 새로 추가. 사용예정일/프로젝트 예산은 기존 DEADLINE_OPTS/
-// BUDGET_OPTS(§ConsultForm 에서도 사용) 를 그대로 재사용해 새 카피를 만들지 않는다.
-const REFERRAL_OPTS = ['검색 (네이버·구글 등)', 'SNS', '지인·업체 소개', '기존 고객', '기타']
+// ── 상담 페이지 (/inquiry, /inquiry?type=estimate) ──────────────────────────────
+// Header "상담 문의"(general)와 Estimator "이 견적으로 상담 신청하기"(estimate)가
+// 하나의 페이지·하나의 submit 구조를 공유한다. 제작 조건 옵션은 새로 만들지 않고 전부
+// TIER_DATA/PAPER_TYPE_OPTIONS(§EstimatorInline)를 그대로 참조한다.
+// 실제 전송 백엔드는 아직 없음 — submitInquiry() 의 TODO 참고. 여기서는 general/estimate
+// 두 mode의 폼 상태와 공용 payload 구성까지만 만든다.
 
 // 기존 Touchgraphic inquiry 의 작은 magenta dot(필수 표시)을 재해석 — Estimator 마스트헤드
 // CMYK 도트에 이미 쓰인 '#DB438F' 를 그대로 재사용(§Portfolio PF_ACCENTS 의 magenta 와도 계열 일치).
@@ -3216,62 +3554,176 @@ function RequiredDot() {
   return <span className="inline-block w-[5px] h-[5px] rounded-full align-middle ml-1" style={{ background: '#DB438F' }} aria-hidden />
 }
 
-function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?: string }) => void }) {
+function InquiryPage({ navigate, search, estimate }: {
+  navigate: (path: string, opts?: { scrollTo?: string }) => void
+  search: string
+  estimate: EstimateSnapshot | null
+}) {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
 
-  const [plan, setPlan] = useState<InquiryPlanId | ''>('')
-  const [quantity, setQuantity] = useState('')
-  const [deadline, setDeadline] = useState('')
-  const [budget, setBudget] = useState('')
-  const [fileName, setFileName] = useState('')
-  const [detail, setDetail] = useState('')
+  // estimate 스냅샷이 실제로 있을 때만 estimate mode — snapshot 없이 ?type=estimate로 직접
+  // 들어온 경우(새로고침으로 세션이 지워졌거나 잘못된 링크)는 general mode로 자연스럽게 대체한다.
+  const requestedEstimate = new URLSearchParams(search).get('type') === 'estimate'
+  const mode: InquiryType = requestedEstimate && estimate ? 'estimate' : 'general'
+  const source: InquirySource = mode === 'estimate' ? 'estimator' : 'header_contact'
+
+  // ── general mode 전용 — 제작 조건(선택 사항, "미정" 허용) ──
+  // Estimator(EstimatorInline)와 동일한 데이터·컴포넌트(TierRow/DesignGrid/SizeOptionRow)를
+  // 재사용한다 — 옵션명을 새로 만들지 않고, 등급별 사이즈 정책·수량 제한도 그대로 따른다.
+  const [genTier, setGenTier] = useState<TierId | null>(null)
+  const [genOptIdx, setGenOptIdx] = useState<Record<string, number | null>>({})
+  const [genCoverFamilyId, setGenCoverFamilyId] = useState<string | null>(null)
+  const [genCoverDesignId, setGenCoverDesignId] = useState<string | null>(null)
+  const [genInnerDesignId, setGenInnerDesignId] = useState<string | null>(null)
+  const [genSizeId, setGenSizeId] = useState<string | null>(null)
+  const [genCustomSizeText, setGenCustomSizeText] = useState('')
+  const [genPaperSpecId, setGenPaperSpecId] = useState<PaperSpecId | null>(null)
+  const [genQuantity, setGenQuantity] = useState<number | null>(null)
+  const genTierData = genTier ? TIER_DATA[genTier] : null
+  const genIsBasic = genTier === 'template'
+  const genOptionGroups = genTierData?.options ? Object.keys(genTierData.options) : []
+  const genCoverFamily = COVER_DESIGN_FAMILIES.find(f => f.id === genCoverFamilyId) ?? null
+  const genCoverDesign = genCoverFamily?.designs.find(x => x.id === genCoverDesignId) ?? null
+  const genInnerDesign = INNER_DESIGNS.find(x => x.id === genInnerDesignId) ?? null
+  const genSize = genTierData?.sizes.find(s => s.id === genSizeId) ?? null
+  const genPaperLabel = genPaperSpecId ? (PAPER_SPEC_OPTIONS.find(p => p.id === genPaperSpecId)?.label ?? null) : null
+
+  function handleGenTier(id: TierId) {
+    if (id === genTier) return
+    setGenTier(id)
+    setGenOptIdx({}) // 등급이 바뀌면 이전 등급 옵션 index는 더 이상 유효하지 않다
+  }
+  function handleGenCoverFamily(familyId: string) {
+    setGenCoverFamilyId(prev => (prev === familyId ? prev : familyId))
+    setGenCoverDesignId(null)
+  }
+  const [genSizeWarning, setGenSizeWarning] = useState<string | null>(null)
+  useEffect(() => {
+    setGenSizeId(prevId => {
+      if (!prevId || !genTierData) return prevId
+      const opt = genTierData.sizes.find(s => s.id === prevId)
+      if (opt && sizeQuantityExceeded(opt, genQuantity)) {
+        setGenSizeWarning(`선택하신 예상 수량(${genQuantity?.toLocaleString()}개)은 ${sizeLabel(opt)}의 최대 제작 수량(${opt.maxQuantity}개)을 초과해 선택이 해제되었습니다. 사이즈를 다시 선택해주세요.`)
+        return null
+      }
+      return prevId
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genQuantity, genTier])
+
+  // ── 공통 — 고객 정보 / 문의 내용 ──
+  const [customerType, setCustomerType] = useState<CustomerType>('')
   const [company, setCompany] = useState('')
   const [contactName, setContactName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [referral, setReferral] = useState('')
-  const [website, setWebsite] = useState('')
+  const [message, setMessage] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [showPrivacy, setShowPrivacy] = useState(false)
-  const [devNotice, setDevNotice] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!plan) return
-    // TODO: 실제 문의 접수 연동 필요(이메일 전송 / 스프레드시트 / CRM 등 실제 backend endpoint 확정 후 연결).
-    // touchagraphic.com 의 실제 endpoint를 추측해서 연결하지 않는다 — 지금은 폼 검증까지만 확인한다.
-    console.log('[InquiryPage] submit — 백엔드 미연결, 폼 상태만 로그로 확인', {
-      plan, quantity, deadline, budget, fileName, detail, company, contactName, phone, email, referral, website,
-    })
-    setDevNotice(true)
+    const payload: InquiryPayload = {
+      site: 'Touchagraphic',
+      project: 'Calendar Landing',
+      inquiry_type: mode,
+      source,
+      company,
+      customer_type: customerType,
+      name: contactName,
+      phone,
+      email,
+      message,
+      production: mode === 'estimate' && estimate
+        ? {
+            grade: estimate.resolved.tierName,
+            size: estimate.resolved.size ?? '',
+            quantity: estimate.resolved.quantity ? String(estimate.resolved.quantity) : '',
+            cover_style: estimate.resolved.coverFamily ?? '',
+            cover_design: estimate.resolved.coverDesignLabel ?? '',
+            inner_design: estimate.resolved.innerDesignLabel ?? '',
+            inner_layout: estimate.resolved.options.find(o => o.group === '내지 레이아웃')?.label ?? '',
+            paper_spec: estimate.resolved.paperSpec ?? '',
+          }
+        : {
+            grade: genTierData?.name ?? '',
+            size: genSize ? sizeLabel(genSize) : '',
+            quantity: genQuantity ? String(genQuantity) : '',
+            cover_style: genIsBasic ? (genCoverFamily?.name ?? '') : '',
+            cover_design: genIsBasic ? (genCoverDesign?.label ?? '') : '',
+            inner_design: genIsBasic ? (genInnerDesign?.label ?? '') : '',
+            inner_layout: genTierData?.options && genOptIdx['내지 레이아웃'] != null ? genTierData.options['내지 레이아웃'][genOptIdx['내지 레이아웃']!] : '',
+            paper_spec: genIsBasic ? (genPaperLabel ?? '') : '',
+          },
+      estimate: {
+        estimated_price: mode === 'estimate' && estimate ? estimate.resolved.total : null,
+        snapshot: mode === 'estimate' && estimate ? estimate.resolved : null,
+      },
+    }
+    setSubmitting(true)
+    await submitInquiry(payload)
+    setSubmitting(false)
+    setSubmitted(true)
   }
 
   const inputCls = "w-full bg-black/[0.035] px-4 py-3 text-[14px] text-black placeholder:text-black/35 focus:outline-none focus:bg-black/[0.06] transition-colors"
   const labelCls = "flex items-center text-[13px] font-medium text-black mb-2"
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header page="inquiry" navigate={navigate} />
+        <div className="min-h-screen flex items-center justify-center px-6">
+          <div className="max-w-[480px] w-full text-center">
+            <p className="mb-4 text-[11px] font-semibold tracking-[0.22em] uppercase text-black/45" style={{ fontFamily: 'Courier New, monospace' }}>Submitted</p>
+            <h1 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(24px, 3.4vw, 34px)', lineHeight: 1.35 }}>
+              상담 신청이 접수되었습니다.
+            </h1>
+            <p className="mt-4 text-[14px] text-black/55 leading-[1.8]" style={fontKr}>
+              확인 후 담당자가 연락드리겠습니다.
+            </p>
+            <p className="mt-6 text-[11px] text-black/35" style={fontKr}>
+              실제 접수 연동(이메일 전송 등)은 아직 준비 중입니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white">
       <Header page="inquiry" navigate={navigate} />
 
       <section className="bg-white">
-        {/* 폭: 예전엔 .u-shell 안에 max-w-[1200px] 가 이중으로 들어가 있어 desktop에서 과하게
-            좁았다(§AGENTS-비교 참고). intro/form이 하나의 .u-inquiry-wide(wide sheet) 를 공유해
-            같은 좌우 축에 정렬되도록 SHELL·개별 max-w-[1200px] 를 제거했다. CONTENT/폼 디자인은
-            변경하지 않음 — 폭 구조만 수정. */}
+        {/* 폭: intro/form이 하나의 .u-inquiry-wide(wide sheet) 를 공유해 같은 좌우 축에 정렬된다. */}
         <div className="u-inquiry-wide">
-          {/* introduction — reference의 큰 2줄 카피 대신, 새 감성 마케팅 카피를 임의로 짓지 않고
-              문의 페이지 목적에 맞는 절제된 안내 문구만 사용(AGENTS §9) */}
+          {/* introduction — mode에 따라 카피만 분기, 새 감성 마케팅 카피는 짓지 않는다(AGENTS §9) */}
           <div className="pt-[140px] lg:pt-[200px] pb-[40px] lg:pb-[56px]">
             <p className="mb-4 lg:mb-6 text-[11px] lg:text-[12px] font-semibold tracking-[0.22em] uppercase text-black/45" style={{ fontFamily: 'Courier New, monospace' }}>
               Inquiry
             </p>
-            <h1 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(28px, 4.2vw, 52px)', lineHeight: 1.25, letterSpacing: '-0.02em' }}>
-              프로젝트를 알려주세요.
-            </h1>
-            <p className="mt-4 text-[14px] lg:text-[15px] text-black/55" style={fontKr}>
-              필요한 내용을 남겨주시면 담당자가 확인 후 빠르게 연락드리겠습니다.
-            </p>
+            {mode === 'estimate' ? (
+              <>
+                <h1 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(28px, 4.2vw, 52px)', lineHeight: 1.25, letterSpacing: '-0.02em' }}>
+                  선택하신 견적으로 상담을 이어갑니다.
+                </h1>
+                <p className="mt-4 text-[14px] lg:text-[15px] text-black/55" style={fontKr}>
+                  방금 만드신 견적 그대로 전달되니 다시 입력하실 필요는 없습니다.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(28px, 4.2vw, 52px)', lineHeight: 1.25, letterSpacing: '-0.02em' }}>
+                  프로젝트 상담
+                </h1>
+                <p className="mt-4 text-[14px] lg:text-[15px] text-black/55" style={fontKr}>
+                  달력 제작에 필요한 내용을 알려주세요. 선택하신 조건을 바탕으로 담당자가 상담을 도와드립니다.
+                </p>
+              </>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="pb-[120px] lg:pb-[160px]">
@@ -3280,92 +3732,284 @@ function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?
               <RequiredDot />
             </div>
 
-            {/* 01 — 플랜 선택 (single select) */}
-            <div className="mt-[56px] lg:mt-[72px]">
-              <div className="flex items-baseline flex-wrap gap-2 mb-5 lg:mb-7">
-                <h2 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
-                  01. 원하는 플랜을 선택해주세요.
-                </h2>
-                <RequiredDot />
-                <span className="text-[12px] text-black/40" style={fontKr}>(하나만 선택 가능)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {INQUIRY_PLANS.map(p => (
-                  <label key={p.id}
-                    className="cursor-pointer text-center px-4 py-5 border text-[14px] font-medium transition-colors"
-                    style={{
-                      ...fontKr,
-                      borderColor: plan === p.id ? '#1A1A1A' : 'rgba(0,0,0,0.16)',
-                      background: plan === p.id ? '#1A1A1A' : '#FFFFFF',
-                      color: plan === p.id ? '#FFFFFF' : '#1A1A1A',
-                    }}
-                  >
-                    <input type="radio" name="plan" value={p.id} required
-                      checked={plan === p.id} onChange={() => setPlan(p.id)} className="sr-only" />
-                    {p.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* 02 — 프로젝트 정보 */}
-            <div className="mt-[56px] lg:mt-[72px]">
-              <h2 className="text-black mb-5 lg:mb-7" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
-                02. 프로젝트 정보를 입력해주세요.
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                <div>
-                  <label className={labelCls} style={fontKr}>제작 수량<RequiredDot /></label>
-                  <input type="text" required value={quantity} onChange={e => setQuantity(e.target.value)}
-                    placeholder="제작 수량을 입력해주세요." className={inputCls} style={fontKr} />
+            {mode === 'estimate' && estimate ? (
+              <div className="mt-[56px] lg:mt-[72px]">
+                <div className="flex items-baseline flex-wrap gap-2 mb-5 lg:mb-7">
+                  <h2 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                    01. 선택하신 견적
+                  </h2>
                 </div>
-                <div>
-                  <label className={labelCls} style={fontKr}>사용예정일<RequiredDot /></label>
-                  <select required value={deadline} onChange={e => setDeadline(e.target.value)} className={inputCls} style={fontKr}>
-                    <option value="" disabled>사용예정일을 선택해주세요.</option>
-                    {DEADLINE_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls} style={fontKr}>프로젝트 예산<RequiredDot /></label>
-                  <select required value={budget} onChange={e => setBudget(e.target.value)} className={inputCls} style={fontKr}>
-                    <option value="" disabled>프로젝트 예산을 선택해주세요.</option>
-                    {BUDGET_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-black mb-2" style={fontKr}>첨부파일</label>
-                  <div className="flex items-stretch">
-                    <div className="flex-1 min-w-0 bg-black/[0.035] px-4 py-3 text-[14px] text-black/35 truncate" style={fontKr}>
-                      {fileName || '파일을 선택해주세요.'}
-                    </div>
-                    <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className="shrink-0 px-5 text-[13px] font-semibold text-white bg-[#1A1A1A] hover:opacity-90 transition-opacity" style={fontKr}>
-                      파일업로드
-                    </button>
-                    <input ref={fileInputRef} type="file" className="hidden"
-                      onChange={e => setFileName(e.target.files?.[0]?.name ?? '')} />
+                <div className="border border-black/15 bg-[#FAFAF8] p-6">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-5">
+                    <span className="text-[16px] font-bold text-black" style={fontKr}>{estimate.resolved.tierName}</span>
+                    {estimate.resolved.size && (
+                      <span className="text-[13px] text-black/55" style={fontKr}>{estimate.resolved.size}</span>
+                    )}
                   </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-5 mb-5 border-b border-black/10">
+                    {estimate.resolved.coverFamily && estimate.resolved.coverDesignLabel && (
+                      <div>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">표지</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>{estimate.resolved.coverFamily} · {estimate.resolved.coverDesignLabel}</p>
+                      </div>
+                    )}
+                    {estimate.resolved.innerDesignLabel && (
+                      <div>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">내지</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>내지 디자인 · {estimate.resolved.innerDesignLabel}</p>
+                      </div>
+                    )}
+                    {estimate.resolved.options.map(o => (
+                      <div key={o.group}>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">{o.group}</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>{o.label}</p>
+                      </div>
+                    ))}
+                    {estimate.resolved.size && (
+                      <div>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">사이즈</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>{estimate.resolved.size}</p>
+                        {estimate.resolved.customSizeText && (
+                          <p className="text-[11.5px] text-black/50 mt-0.5" style={fontKr}>{estimate.resolved.customSizeText}</p>
+                        )}
+                      </div>
+                    )}
+                    {estimate.resolved.paperSpec && (
+                      <div>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">종이</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>{estimate.resolved.paperSpec}</p>
+                      </div>
+                    )}
+                    {estimate.resolved.quantity && (
+                      <div>
+                        <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1">예상 수량</p>
+                        <p className="text-[13px] font-medium text-black" style={fontKr}>{estimate.resolved.quantity.toLocaleString()}개</p>
+                      </div>
+                    )}
+                  </div>
+                  {estimate.resolved.fixedSpec.length > 0 && (
+                    <div className="pb-5 mb-5 border-b border-black/10">
+                      <p className="text-[10px] font-mono text-black/40 tracking-widest mb-1.5">기본 제작</p>
+                      <p className="text-[13px] font-medium text-black" style={fontKr}>{estimate.resolved.fixedSpec.join(' · ')}</p>
+                    </div>
+                  )}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[11px] font-medium text-black/50" style={fontKr}>예상 견적</span>
+                    <span className="font-bold tabular-nums text-black" style={{ ...fontKr, fontSize: 'clamp(20px, 3vw, 26px)' }}>
+                      {wonFmt(estimate.resolved.total)}<small className="text-[13px] font-semibold ml-0.5">원</small>
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[10.5px] text-black/45" style={fontKr}>부가세·인쇄·배송비 별도. 최종 견적은 상담 후 확정됩니다.</p>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className={labelCls} style={fontKr}>상세 문의내용<RequiredDot /></label>
-                  <textarea required value={detail} onChange={e => setDetail(e.target.value)}
-                    placeholder="상세 문의 내용을 입력해주세요." rows={6}
-                    className={`${inputCls} resize-none`} style={fontKr} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/', { scrollTo: 'estimator-scroll-target' })}
+                  className="mt-3 text-[12px] underline underline-offset-2 text-black/55 hover:text-black transition-colors"
+                  style={fontKr}
+                >
+                  견적 다시 수정하기
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="mt-[56px] lg:mt-[72px]">
+                <div className="flex items-baseline flex-wrap gap-2 mb-5 lg:mb-7">
+                  <h2 className="text-black" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                    01. 제작 조건을 알려주세요.
+                  </h2>
+                  <span className="text-[12px] text-black/40" style={fontKr}>(아직 정해지지 않았다면 비워두셔도 됩니다)</span>
+                </div>
 
-            {/* 03 — 기본정보 (기존 reference 의 04 프로젝트 상세 타입 accordion은 만들지 않고 바로 privacy/submit 로 이어진다) */}
+                <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>제작 등급</p>
+                <div className="flex flex-col gap-2 mb-8">
+                  {TIER_ORDER.map(id => (
+                    <TierRow key={id} id={id} selected={genTier === id} onSelect={() => handleGenTier(id)} />
+                  ))}
+                </div>
+
+                {genTierData && (
+                  <>
+                    {/* 베이직 — Estimator 와 동일한 표지/내지 실제 디자인 선택(§3·4) */}
+                    {genIsBasic && (
+                      <>
+                        <div className="mb-8">
+                          <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>표지 스타일</p>
+                          <div className="flex flex-wrap gap-3 mb-4">
+                            {COVER_DESIGN_FAMILIES.map(f => {
+                              const on = genCoverFamilyId === f.id
+                              return (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  onClick={() => handleGenCoverFamily(f.id)}
+                                  className="flex items-center gap-2.5 text-left"
+                                  style={{
+                                    padding: '13px 18px',
+                                    border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                                    background: on ? CFG_SEL_BG : '#ffffff',
+                                    transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                                  }}
+                                  onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                                  onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                                >
+                                  <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{f.name}</span>
+                                  <CheckDisc on={on} />
+                                </button>
+                              )
+                            })}
+                          </div>
+                          {genCoverFamily ? (
+                            <DesignGrid designs={genCoverFamily.designs} selectedId={genCoverDesignId} onSelect={setGenCoverDesignId} />
+                          ) : (
+                            <p className="text-[12.5px] text-black/45 leading-[1.6]" style={fontKr}>표지 계열을 먼저 선택하면 실제 시안 6개가 표시됩니다.</p>
+                          )}
+                        </div>
+
+                        <div className="mb-8">
+                          <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>내지 디자인</p>
+                          <DesignGrid designs={INNER_DESIGNS} selectedId={genInnerDesignId} onSelect={setGenInnerDesignId} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* 사이즈 — 등급별 정책(베이직: 기성 4종 / 커스텀·하이앤드: 기성 4종 + 별도 사이즈) */}
+                    <div className="mb-8">
+                      <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>사이즈</p>
+                      <div className="flex flex-col gap-2">
+                        {genTierData.sizes.map(opt => (
+                          <SizeOptionRow
+                            key={opt.id}
+                            opt={opt}
+                            selected={genSizeId === opt.id}
+                            disabled={sizeQuantityExceeded(opt, genQuantity)}
+                            onSelect={() => { setGenSizeId(opt.id); setGenSizeWarning(null) }}
+                          />
+                        ))}
+                      </div>
+                      {genSizeWarning && (
+                        <p className="mt-2 text-[12px] text-[#B8462B] leading-[1.6] break-keep" style={fontKr}>{genSizeWarning}</p>
+                      )}
+                      {genSize?.custom && (
+                        <div className="mt-2 p-4" style={{ background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
+                          <p className="text-[12.5px] text-black/60 leading-[1.6] mb-3" style={fontKr}>
+                            별도 사이즈는 가격을 자동으로 계산하지 않습니다. 희망 규격을 남겨주시면 상담 시 별도 견적을 안내해 드립니다.
+                          </p>
+                          <label className="block text-[11px] font-medium text-black/50 mb-1.5" style={fontKr}>희망 사이즈 (선택)</label>
+                          <input
+                            type="text" value={genCustomSizeText} onChange={e => setGenCustomSizeText(e.target.value)}
+                            placeholder="예: 가로 300mm × 세로 200mm"
+                            className="w-full bg-white px-3 py-2.5 text-[13px] text-black placeholder:text-black/30 focus:outline-none"
+                            style={{ ...fontKr, border: '1px solid rgba(26,26,26,0.15)' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 커스텀/하이앤드 전용 텍스트 옵션(내지 레이아웃) */}
+                    {genOptionGroups.map(g => (
+                      <div key={g} className="mb-8">
+                        <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>{g}</p>
+                        <div className="flex flex-col gap-2">
+                          {genTierData.options![g].map((opt, oi) => (
+                            <OptionRow
+                              key={opt}
+                              groupLabel={g}
+                              opt={opt}
+                              selected={genOptIdx[g] === oi}
+                              onSelect={() => setGenOptIdx(prev => ({ ...prev, [g]: oi }))}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* 베이직 전용 — 종이 사양(미정 없음) + 고정 제작 사양 안내 */}
+                    {genIsBasic && (
+                      <div className="mb-8">
+                        <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>종이 사양</p>
+                        <div className="flex flex-wrap gap-3">
+                          {PAPER_SPEC_OPTIONS.map(({ id, label }) => {
+                            const on = genPaperSpecId === id
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setGenPaperSpecId(id)}
+                                className="flex items-center gap-2.5 text-left"
+                                style={{
+                                  padding: '13px 18px',
+                                  border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                                  background: on ? CFG_SEL_BG : '#ffffff',
+                                  transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                                }}
+                                onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                                onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                              >
+                                <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{label}</span>
+                                <CheckDisc on={on} />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="max-w-[280px] mb-8">
+                  <label className={labelCls} style={fontKr}>예상 수량</label>
+                  <input
+                    type="number" min={1} inputMode="numeric"
+                    value={genQuantity ?? ''}
+                    onChange={e => { const v = e.target.value; setGenQuantity(v === '' ? null : Math.max(0, parseInt(v, 10) || 0)) }}
+                    placeholder="예: 500 (미정이어도 괜찮습니다)" className={inputCls} style={fontKr}
+                  />
+                  <p className="mt-2 text-[11.5px] text-black/45 leading-[1.6]" style={fontKr}>280 × 125 mm · 96 × 121 mm 사이즈는 300개 이하에서만 제작 가능합니다.</p>
+                </div>
+
+                {genIsBasic && genTierData && genTierData.fixedSpec && (
+                  <div>
+                    <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>{genTierData.name} 기본 제작 사양</p>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                      {genTierData.fixedSpec.map(spec => (
+                        <span key={spec} className="text-[13.5px] font-medium text-black" style={fontKr}>{spec}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 고객 정보 — 기업/공공기관 모두 대상이므로 회사명을 고정하지 않고 "회사/기관명"으로 통일 */}
             <div className="mt-[56px] lg:mt-[72px]">
               <h2 className="text-black mb-5 lg:mb-7" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
-                03. 기본정보를 입력해주세요.
+                {mode === 'estimate' ? '02. 고객 정보를 입력해주세요.' : '02. 고객 정보를 입력해주세요.'}
               </h2>
+              <div className="mb-5">
+                <label className="block text-[13px] font-medium text-black mb-2" style={fontKr}>고객 유형</label>
+                <div className="flex gap-2">
+                  {(['기업', '공공기관', '기타'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setCustomerType(prev => prev === t ? '' : t)}
+                      className="px-4 py-2 text-[13px] font-medium border transition-colors"
+                      style={{
+                        ...fontKr,
+                        borderColor: customerType === t ? '#1A1A1A' : 'rgba(0,0,0,0.16)',
+                        background: customerType === t ? '#1A1A1A' : '#FFFFFF',
+                        color: customerType === t ? '#FFFFFF' : '#1A1A1A',
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
                 <div>
-                  <label className={labelCls} style={fontKr}>회사명<RequiredDot /></label>
+                  <label className={labelCls} style={fontKr}>회사 / 기관명<RequiredDot /></label>
                   <input type="text" required value={company} onChange={e => setCompany(e.target.value)}
-                    placeholder="회사명을 입력해주세요." className={inputCls} style={fontKr} />
+                    placeholder="회사 또는 기관명을 입력해주세요." className={inputCls} style={fontKr} />
                 </div>
                 <div>
                   <label className={labelCls} style={fontKr}>담당자명<RequiredDot /></label>
@@ -3382,19 +4026,21 @@ function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?
                   <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                     placeholder="이메일주소를 입력해주세요." className={inputCls} style={fontKr} />
                 </div>
-                <div>
-                  <label className={labelCls} style={fontKr}>유입경로<RequiredDot /></label>
-                  <select required value={referral} onChange={e => setReferral(e.target.value)} className={inputCls} style={fontKr}>
-                    <option value="" disabled>유입경로를 선택해주세요.</option>
-                    {REFERRAL_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-black mb-2" style={fontKr}>웹사이트</label>
-                  <input type="text" value={website} onChange={e => setWebsite(e.target.value)}
-                    placeholder="웹사이트를 입력해주세요." className={inputCls} style={fontKr} />
-                </div>
               </div>
+            </div>
+
+            {/* 문의 내용 */}
+            <div className="mt-[56px] lg:mt-[72px]">
+              <h2 className="text-black mb-5 lg:mb-7" style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(18px, 1.6vw, 22px)' }}>
+                {mode === 'estimate' ? '03. 추가 요청사항' : '03. 문의 내용을 알려주세요.'}
+              </h2>
+              <textarea
+                required={mode === 'general'}
+                value={message} onChange={e => setMessage(e.target.value)}
+                placeholder={mode === 'estimate' ? '따로 전달하고 싶은 내용이 있다면 남겨주세요. (선택)' : '상세 문의 내용을 입력해주세요.'}
+                rows={6}
+                className={`${inputCls} resize-none`} style={fontKr}
+              />
             </div>
 
             {/* privacy + submit */}
@@ -3411,22 +4057,17 @@ function InquiryPage({ navigate }: { navigate: (path: string, opts?: { scrollTo?
               {showPrivacy && (
                 <p className="mt-3 max-w-[720px] text-[12px] leading-[1.8] text-black/50" style={fontKr}>
                   {/* TODO: 실제 개인정보처리방침 전문/페이지로 교체 필요 — 현재는 임시 안내문 */}
-                  문의 답변을 위해 위에 입력하신 회사명·담당자명·연락처·이메일 등 정보를 수집·이용합니다.
+                  문의 답변을 위해 위에 입력하신 회사/기관명·담당자명·연락처·이메일 등 정보를 수집·이용합니다.
                   수집한 정보는 문의 응대 목적으로만 사용하며, 처리 완료 후 파기합니다.
                 </p>
               )}
 
               <div className="mt-8 flex flex-col items-center gap-3">
-                <button type="submit"
-                  className="inline-flex items-center gap-2.5 border border-black px-10 py-4 text-[15px] font-bold text-black hover:bg-black hover:text-white transition-colors"
+                <button type="submit" disabled={submitting}
+                  className="inline-flex items-center gap-2.5 border border-black px-10 py-4 text-[15px] font-bold text-black hover:bg-black hover:text-white transition-colors disabled:opacity-50"
                   style={fontKr}>
-                  프로젝트 의뢰하기 <span aria-hidden>→</span>
+                  {mode === 'estimate' ? '이 견적으로 상담 신청하기' : '상담 신청하기'} <span aria-hidden>→</span>
                 </button>
-                {devNotice && (
-                  <p className="text-[12px] text-black/45" style={fontKr}>
-                    입력하신 내용 확인했습니다. 실제 접수 연동(이메일 전송 등)은 아직 준비 중입니다.
-                  </p>
-                )}
               </div>
             </div>
           </form>
@@ -3519,8 +4160,6 @@ function ScrollSectionNav() {
 // App 루트
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [view, setView] = useState<AppView>('landing')
-  const [sels] = useState<Sels>({ ...DEFAULT_SELS })
   // 라우터 라이브러리 없이 pathname 만으로 '/' ↔ '/portfolio' ↔ '/portfolio/:idx' ↔ '/inquiry' 를
   // 전환한다(§AGENTS: 최소 구조). '/portfolio/:idx' 는 pathname 그대로를 route 로 사용하고
   // App() 렌더링에서 정규식으로 idx 를 다시 뽑아낸다(별도 라우팅 라이브러리 설치 없음).
@@ -3531,20 +4170,32 @@ export default function App() {
     return '/'
   }
   const [route, setRoute] = useState(() => pathToRoute(window.location.pathname))
+  // '/inquiry?type=estimate' 처럼 진입 mode를 구분하는 쿼리 — route(pathname) 매칭과는 분리해
+  // 필요한 페이지(InquiryPage)에서만 파싱한다. pathToRoute 자체는 그대로 pathname만 본다.
+  const [routeSearch, setRouteSearch] = useState(() => window.location.search)
   // 다른 라우트로 이동하면서 도착 후 특정 섹션으로 스크롤해야 하는 경우(예: /portfolio → '/' → estimator)를 위한 예약값.
   const pendingScrollRef = useRef<string | null>(null)
 
+  // Estimator "이 견적으로 상담 신청하기"에서 넘어온 선택값 — App이 소유해 '/' ↔ '/inquiry' 이동에도
+  // 유지되고, sessionStorage에도 백업해 새로고침에도 살아남는다(영구 저장은 아님).
+  const [estimateSnapshot, setEstimateSnapshot] = useState<EstimateSnapshot | null>(() => loadEstimateSnapshot())
+
   useEffect(() => {
-    function onPopState() { setRoute(pathToRoute(window.location.pathname)) }
+    function onPopState() {
+      setRoute(pathToRoute(window.location.pathname))
+      setRouteSearch(window.location.search)
+    }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   function navigate(path: string, opts?: { scrollTo?: string }) {
     pendingScrollRef.current = opts?.scrollTo ?? null
-    if (window.location.pathname !== path) window.history.pushState({}, '', path)
+    const [base, search = ''] = path.split('?')
+    if (window.location.pathname + window.location.search !== path) window.history.pushState({}, '', path)
     window.scrollTo(0, 0)
-    setRoute(path)
+    setRoute(pathToRoute(base))
+    setRouteSearch(search ? `?${search}` : '')
   }
 
   useEffect(() => {
@@ -3554,9 +4205,12 @@ export default function App() {
     requestAnimationFrame(() => scrollToAnchor(id))
   }, [route])
 
-  useEffect(() => { if (view === 'landing') return; window.scrollTo(0, 0) }, [view])
-
-  function reset() { setView('landing') }
+  // 견적 → 상담 신청 전환: snapshot을 저장(state + 세션 백업)한 뒤 estimate mode로 이동한다.
+  function handleEstimateConsult(snapshot: EstimateSnapshot) {
+    setEstimateSnapshot(snapshot)
+    saveEstimateSnapshot(snapshot)
+    navigate('/inquiry?type=estimate')
+  }
 
   if (route === '/portfolio') {
     return <PortfolioPage navigate={navigate} />
@@ -3570,11 +4224,7 @@ export default function App() {
   }
 
   if (route === '/inquiry') {
-    return <InquiryPage navigate={navigate} />
-  }
-
-  if (view === 'consult') {
-    return <ConsultForm sels={sels} onBack={() => setView('landing')} onReset={reset} />
+    return <InquiryPage navigate={navigate} search={routeSearch} estimate={estimateSnapshot} />
   }
 
   return (
@@ -3583,7 +4233,7 @@ export default function App() {
       <ScrollSectionNav />
       <Hero />
       <Portfolio navigate={navigate} />
-      <EstimatorSection onConsult={() => setView('consult')} />
+      <EstimatorSection onConsult={handleEstimateConsult} initialSnapshot={estimateSnapshot} />
       <CertificationSection />
       <Clients />
       <FaqSection />
@@ -3593,5 +4243,7 @@ export default function App() {
 
 // 레거시(현재 미사용): TrustStrip · Consultation · FAQ · Footer · Service · Contact.
 // EXHIBITIONS = 구 4:5 썸네일 데이터(§22 로 보존, 렌더는 PORTFOLIO 사용).
+// ConsultForm = Estimator "이 견적으로 상담 신청하기"가 예전에 쓰던 내부 view("consult") 전용
+// 화면 — 이제 EstimatorInline이 InquiryPage(/inquiry?type=estimate)로 직접 이동하므로 미사용.
 // 기존 정의는 남겨두되 렌더하지 않는다.
-void TrustStrip; void Consultation; void FAQ; void Footer; void Service; void Contact; void EXHIBITIONS;
+void TrustStrip; void Consultation; void FAQ; void Footer; void Service; void Contact; void EXHIBITIONS; void ConsultForm;
