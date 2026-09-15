@@ -7,13 +7,13 @@
 
 ## 1. 현재 기준점
 
-- 날짜: 2026-09-14
+- 날짜: 2026-09-15
 - branch: `v2-redesign` (origin에 tracking됨)
 - latest commit: 세션 시작 시 `git log -1 --oneline`으로 실제 Git에서 확인 (이 문서에 SHA를 고정하지 않음 — 실제 Git이 source of truth)
-- 안전 checkpoint: `checkpoint/2026-09-14` 브랜치로 origin에 push 완료(커밋 `c117d2e`, local `v2-redesign`과 동일 지점). `origin/v2-redesign`에는 아직 반영되지 않았다(§4 참고) — 이 SHA는 "현재 최신 상태"가 아니라 그 시점의 고정된 복원 지점이라 예외적으로 기록한다(§V1 `7f9fae0` 표기와 동일한 성격, §6 참고).
+- 이번 세션 작업분은 `origin/v2-redesign`에 push 완료 + `checkpoint/2026-09-15` 브랜치로도 같은 지점에 안전 저장됨(§4). 지난 `checkpoint/2026-09-14`와 달리 이번엔 checkpoint가 `v2-redesign`과 같은 지점이라 별도 SHA를 고정 기록하지 않는다 — 필요하면 `git rev-parse checkpoint/2026-09-15`로 확인.
 - GitHub remote: `https://github.com/Taesaje/touchagraphic-calendar-v2.git`
-- V2 검토용 Netlify URL: `https://gleaming-naiad-0686ac.netlify.app/` (origin/v2-redesign push 시 git 연동 자동 재배포 확인됨 — 이번 checkpoint는 이 브랜치에 push하지 않았으므로 재배포 없음)
-- build 상태: `npm run build` / `npx tsc --noEmit` 성공 (2026-09-14 checkpoint 기준)
+- V2 검토용 Netlify URL: `https://gleaming-naiad-0686ac.netlify.app/` (origin/v2-redesign push 시 git 연동 자동 재배포)
+- build 상태: `npm run build` / `npx tsc --noEmit` 성공 (2026-09-15 기준)
 
 ## 2. 현재 사이트 구조
 
@@ -32,50 +32,64 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
 
 ## 3. 현재 완료된 핵심 기능
 
-- Landing: Header(브랜드 심볼 `public/brand/touchagraphic-symbol.png` + "터치어그래픽" 워드마크 lock-up)
-  / Hero(eyebrow="터치어그래픽", Header→Hero 여백 축소, 헤드라인 line-height 1.14→1.28)
-  / Portfolio(캐러셀, 카드가 각 프로젝트 실제 상세페이지로 연결) / EstimatorSection / CertificationSection
-  / Clients / FAQ 정상 렌더
+- Landing: Header / Hero / Portfolio(캐러셀) / EstimatorSection / CertificationSection / Clients / FAQ 정상 렌더
 - Portfolio 전체보기(`/portfolio`)·상세(`/portfolio/:idx`) — 실제 프로젝트 데이터, detail image 웹 최적화 asset
-- Estimator(`EstimatorInline`) — 가격 계산식(`TIER_DATA`/`tierBaseTotal`)은 동결 유지. BASIC은
-  표지 계열(붉은양 일러스트/2027 그래픽) → 실제 시안 6개, 내지 디자인 실제 시안 6개를 가로형 이미지
-  grid에서 선택하는 구조로 개편. 사이즈는 실제 규격(mm) 기반으로 BASIC은 기성 4종만, 커스텀/하이앤드는
-  기성 4종 + 별도 사이즈. "수량"은 "예상 수량"으로 통일, 300개 이하 제한 사이즈는 초과 입력 시 자동 disable
-- `/inquiry` — 일반 상담과 Estimator "이 견적으로 상담 신청하기"가 하나의 페이지·하나의 데이터 모델
-  (`InquiryPayload`)을 공유. 견적 선택값은 App state + sessionStorage로 유지(새로고침에도 복원).
-  실제 접수 API는 아직 미연결 — `submitInquiry()` 어댑터만 존재(콘솔 로그로만 확인)
-- 표지/내지 실제 시안 이미지 asset은 아직 미준비 — 현재 "이미지 준비중" placeholder 표시 중(§6)
+- Estimator(`EstimatorInline`) — 가격 계산식(`TIER_DATA`/`tierBaseTotal`)은 동결 유지, 변경 없음.
+- **베이직(실속형) 표지/내지 시안 — 실제 이미지 연결 완료(2026-09-15).**
+  - 표지 "2027 그래픽" 6개, 내지 디자인 6개 모두 실제 asset 연결됨(§6 경로 참고). "붉은양 일러스트"는
+    아직 asset 미준비 상태로 `image: null` → "이미지 준비중" placeholder 유지.
+  - 시안 비교 thumbnail: 4:3 프레임 + `object-cover` + `DesignOption.previewScale/previewX/previewY`
+    metadata로 각 사진의 검은 스튜디오 배경을 크롭하고 "달력 디자인 면"을 크게 보여준다
+    (`makeDesignSlots`의 `framing` 인자, `src/App.tsx` `COVER_DESIGN_FAMILIES`/`INNER_DESIGNS`).
+    현재 값: 표지 2027 그래픽 `scale 1.62 / y 4`, 내지 `scale 1.72 / y 3`(6개 전부 공통값 — 실측상
+    12장이 거의 동일한 카메라 세팅으로 촬영되어 개별 보정이 필요 없었음).
+  - desktop 2열 / mobile 1열 그리드 유지. 각 시안 카드 우상단에 "크게 보기" 버튼 → `DesignZoomOverlay`
+    (createPortal로 body에 직접 렌더링, 원본 전체를 object-contain으로 표시, ESC/바깥 클릭/닫기 버튼
+    지원, 불투명 dark backdrop — 반투명 배경은 Header의 backdrop-blur와 겹칠 때 알파 블렌딩이 깨지는
+    실제 Chromium 렌더링 버그가 있어 불투명으로 처리함, 코드 주석 참고).
+  - "표지 스타일" / "내지 디자인" 아코디언 제목 옆 "6개 중 1개 선택" 안내 문구는 제목보다 작고 옅은
+    보조 텍스트로 위계 분리(`AccordionRow`의 `sublabel` prop).
+  - 이미지 파일이 없거나 404여도 `onError`로 감지해 placeholder로 자동 대체 — 깨진 이미지 아이콘 노출 없음.
+  - `/inquiry?type=estimate`(InquiryPage)도 같은 `COVER_DESIGN_FAMILIES`/`INNER_DESIGNS`/`DesignGrid`를
+    공유하므로 이미지·framing이 자동으로 동일하게 반영됨(중복 데이터 없음). 단 "6개 중 1개 선택"
+    sublabel 위계 변경은 InquiryPage에는 적용 안 됨(원래 그 문구 자체가 없었음).
 - `AGENTS.md`에 Engineering Guardrails 추가(작업 위험도별 대응, 기술부채 보고, Architecture Audit 기준 등)
-- Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포, 기존 확인 완료 — 이번 세션 변경분은
-  `checkpoint/2026-09-14`에만 있고 `origin/v2-redesign`에는 아직 미반영이라 재배포되지 않았다)
-- `npm run publish:v2` — build → safe staging → commit → push 자동화(기존 검증 완료, 이번 세션에는 미실행)
+- Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포)
+- `npm run publish:v2` — build → safe staging → commit → push 자동화(기존 검증 완료)
 
 ## 4. 현재 진행 중인 작업
 
-2026-09-14 작업(Portfolio 카드 routing, Estimator 개편, Contact 통합, Hero/Header 브랜드 정비,
-AGENTS Guardrails)은 로컬에서 완료·검수되어 `checkpoint/2026-09-14` 브랜치로 origin에 안전 저장된
-상태다. `origin/v2-redesign`(Netlify production 연동 브랜치)에는 아직 push하지 않았다 — 사용자
-최종 검토 후 반영 여부를 결정한다.
+2026-09-15 작업(베이직 표지/내지 실제 이미지 연결, 시안 비교 thumbnail framing 개선, 확대보기
+overlay 추가, "6개 중 1개 선택" 문구 위계 분리)은 로컬 검수·build/tsc 통과 후 `origin/v2-redesign`에
+push 완료. 같은 지점에 `checkpoint/2026-09-15` 브랜치도 origin에 생성해 안전 저장.
 
 working tree의 세부 modified/untracked 상태는 세션 시작 시 `git status --short`로 직접 확인한다.
 PROJECT_NOW.md에는 파일별 modified/untracked 상태를 저장하지 않는다.
 
 ## 5. 다음 우선순위
 
-1. Estimator / Hero / Header 최신 localhost 상태부터 시각 검수 후 다음 수정 작업 진행
-2. 표지 시안(붉은양 일러스트·2027 그래픽 각 6장) / 내지 디자인 시안(6장) 실제 이미지 asset 확보 및 적용(§6)
-3. 준비되면 `checkpoint/2026-09-14`를 `origin/v2-redesign`으로 반영할지 결정
-4. Portfolio 랜딩 카드 최종 7개 선정 확정 여부 점검(미확정 상태로 남아있음)
+1. 내지 thumbnail framing(`INNER_DESIGNS`의 `scale 1.72 / y 3`)을 사용자가 실제 화면에서 다시 보고
+   조금 더 여유 있게(또는 반대로 더 타이트하게) 조정하고 싶어할 가능성이 있음 — 다음 세션에서 실제
+   화면을 보고 필요 시 `previewScale`/`previewY`만 미세 조정한다. 표지 framing·4:3 비율·확대보기
+   overlay·카드 선택 UX는 이미 확정되어 유지 중이므로 별다른 요청 없이는 재조정하지 않는다.
+2. "붉은양 일러스트" 표지 계열 실제 시안 6장 이미지 asset 확보 및 연결(현재 "이미지 준비중"
+   placeholder 상태) — 경로 규칙은 §6 참고, 확보되면 2027 그래픽과 동일한 방식으로 연결.
+3. Portfolio 랜딩 카드 최종 7개 선정 확정 여부 점검(미확정 상태로 남아있음)
 
 ## 6. 보호해야 하는 것
 
-- Estimator 가격/계산 로직 (`TIER_DATA`, `tierBaseTotal`, `total` 계산식)
-- V1 공개본 (Netlify + 아임웹, main 브랜치 `7f9fae0` 기준) — V2 작업과 분리 유지
+- Estimator 가격/계산 로직 (`TIER_DATA`, `tierBaseTotal`, `total` 계산식) — 이번 세션에서도 변경 없음
+- V1 공개본 (Netlify + 아임웹, main 브랜치 기준) — V2 작업과 분리 유지
 - 실제 Portfolio 데이터(`CALENDAR_PORTFOLIO`, 17개 프로젝트) 및 이미지 asset 경로
 - 기존 routing 목적지 (`/`, `/portfolio`, `/portfolio/:idx`, `/inquiry`, `/inquiry?type=estimate`)
 - 확정된 핵심 카피/이미지 (요청 없는 임의 변경 금지)
-- 표지/내지 시안 이미지가 아직 없다고 임의의 AI 생성 이미지나 다른 사진으로 대체하지 않는다 — 실제
-  asset 확보 전까지는 "이미지 준비중" placeholder 상태를 그대로 유지한다(§3·§5)
+- 베이직 표지/내지 실제 이미지 asset 경로·파일명 규칙(고정, 실제 파일 존재):
+  - 표지 "2027 그래픽": `public/estimator/basic/cover-2027/cover-2027-01.jpg` ~ `06.jpg`
+  - 내지 디자인: `public/estimator/basic/interior/interior-01.jpg` ~ `06.jpg`
+  - "붉은양 일러스트"는 아직 asset 없음 — 준비되기 전까지 임의의 AI 생성 이미지나 다른 사진으로
+    대체하지 않는다.
+- DB/API/Admin/Auth는 아직 손대지 않음 — 다음 단계에서 필요해지면 §Engineering Guardrails의
+  HIGH RISK 절차(구현 전 architecture/security boundary 검토·보고)를 따른다.
 
 상세 작업 방식/판단 기준은 `BUILDING_PROFILE.md`를 따른다.
 
@@ -89,6 +103,7 @@ PROJECT_NOW.md에는 파일별 modified/untracked 상태를 저장하지 않는�
 - `src/index.css`
 - `src/data/calendarPortfolio.ts`
 - `public/portfolio/calendar/`
+- `public/estimator/basic/cover-2027/`, `public/estimator/basic/interior/` (베이직 표지/내지 실제 이미지)
 - `scripts/publish-v2.mjs`
 - `package.json`
 
@@ -98,6 +113,14 @@ PROJECT_NOW.md에는 파일별 modified/untracked 상태를 저장하지 않는�
 
 ```
 BUILDING_PROFILE.md → PROJECT_NOW.md → (필요 시) PROJECT_STATUS.md 관련 섹션 → 실제 코드/Git 확인
+```
+
+새 PC로 전환할 때는 먼저:
+
+```
+git fetch origin
+git status
+git pull origin v2-redesign
 ```
 
 개발 서버:

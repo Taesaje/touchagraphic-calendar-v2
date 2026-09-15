@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 import { CALENDAR_PORTFOLIO, getCalendarProjectByIdx } from '@/data/calendarPortfolio'
 
@@ -201,23 +202,63 @@ function sizeQuantityExceeded(opt: SizeOption, quantity: number | null) {
 
 // ── 베이직 전용 — 표지 / 내지 디자인 시안 ─────────────────────────────────────
 // 표지는 "붉은양 일러스트" / "2027 그래픽" 두 계열, 각 계열 안에 실제 시안 6개 중 1개를
-// 고른다. 내지는 계열 구분 없이 실제 디자인 6개 중 1개. 실제 asset은 아직 준비되지 않아
-// image: null 상태 — 이 경우 DesignTile이 "이미지 준비중" placeholder로 표시한다(§DesignTile).
-// 실제 파일이 생기면 image 자리에 import 경로만 채우면 된다(가격 계산과 무관, 표시 전용).
-type DesignOption = { id: string; label: string; image: string | null }
+// 고른다. 내지는 계열 구분 없이 실제 디자인 6개 중 1개.
+// 실제 asset 경로 규칙(고정) — 이 파일명대로 넣으면 자동으로 반영된다:
+//   표지 "2027 그래픽" 6개: public/estimator/basic/cover-2027/cover-2027-01.jpg ~ 06.jpg
+//   내지 디자인 6개:        public/estimator/basic/interior/interior-01.jpg ~ 06.jpg
+// 아직 파일이 없는 슬롯(또는 "붉은양 일러스트"처럼 imagePath를 주지 않은 계열)은 image: null
+// 이 되어 DesignTile이 "이미지 준비중" placeholder로 표시한다(§DesignTile). 파일이 404여도
+// DesignTile의 onError 처리로 동일하게 placeholder로 대체되어 깨진 이미지 아이콘은 노출되지 않는다.
+// "붉은양 일러스트"도 실제 asset이 준비되면 makeDesignSlots에 동일한 방식(prefix + imagePath)의
+// 세 번째 인자만 추가하면 된다.
+//
+// previewScale/previewX/previewY — 실제 사진은 검은 스튜디오 배경 위에 제품이 작게 촬영되어
+// 있어, 비교용 썸네일에서는 DesignTile이 object-cover 위에 이 값으로 중앙 기준 확대(+ 필요 시
+// 위치 미세조정)해 "달력 디자인 면"이 검은 배경보다 훨씬 크게 보이도록 한다. 카드의 목적은 원본
+// 사진 전체를 예쁘게 보여주는 게 아니라 타이포/레이아웃/숫자 배열 차이를 빠르게 비교하는 것 —
+// 원본 전체는 "크게 보기" 모달(DesignZoomOverlay)에서 이 값과 무관하게 object-contain으로 본다.
+// 시안마다 촬영 프레이밍이 달라지면 previewX/previewY(퍼센트, translate 기준)로 개별 조정한다.
+type DesignOption = {
+  id: string; label: string; image: string | null
+  previewScale?: number; previewX?: number; previewY?: number
+}
 type CoverDesignFamily = { id: string; name: string; designs: DesignOption[] }
-function makeDesignSlots(prefix: string, count: number): DesignOption[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `${prefix}-${i + 1}`,
-    label: `시안 ${String(i + 1).padStart(2, '0')}`,
-    image: null as string | null,
-  }))
+// framing(n) — 시안 번호(1-base) → 개별 확대/위치값. 12장을 실측한 결과 사진들이 거의 동일한
+// 카메라 위치/제품 배치로 촬영되어 있어 계열별로 공통값에서 시작했고, 실제 화면 검수 후 어긋나는
+// 시안만 previewX/Y로 개별 보정했다(§완료보고 참고). 이미지가 없는 슬롯은 framing을 적용하지 않는다.
+function makeDesignSlots(
+  prefix: string, count: number,
+  imagePath?: (n: number) => string,
+  framing?: (n: number) => { scale?: number; x?: number; y?: number },
+): DesignOption[] {
+  return Array.from({ length: count }, (_, i) => {
+    const n = i + 1
+    const f = imagePath ? framing?.(n) : undefined
+    return {
+      id: `${prefix}-${n}`,
+      label: `시안 ${String(n).padStart(2, '0')}`,
+      image: imagePath ? imagePath(n) : null,
+      previewScale: f?.scale,
+      previewX: f?.x,
+      previewY: f?.y,
+    }
+  })
 }
 const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
   { id: 'red-sheep',    name: '붉은양 일러스트', designs: makeDesignSlots('red-sheep', 6) },
-  { id: '2027-graphic', name: '2027 그래픽',    designs: makeDesignSlots('2027-graphic', 6) },
+  {
+    id: '2027-graphic', name: '2027 그래픽',
+    designs: makeDesignSlots(
+      '2027-graphic', 6, n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
+      () => ({ scale: 1.62, y: 4 }),
+    ),
+  },
 ]
-const INNER_DESIGNS: DesignOption[] = makeDesignSlots('inner', 6)
+// 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
+const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
+  'inner', 6, n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
+  () => ({ scale: 1.72, y: 3 }),
+)
 
 // 베이직 전용 종이 사양 — "미정"을 없애고 실제 제공 사양 중 하나를 반드시 고르게 한다.
 // 값 자체는 기존 Estimator 데이터(스노우지/랑데뷰지)를 그대로 쓴다.
@@ -1210,10 +1251,11 @@ function CheckDisc({ on }: { on: boolean }) {
 
 // 접히는 단계 셸 — 헤더(라벨 · 선택값 · 상태 · 화살표) + 애니메이션 본문.
 function AccordionRow({
-  index, label, open, onToggle, done, selectedLabel, hint, count, rowRef, children,
+  index, label, sublabel, open, onToggle, done, selectedLabel, hint, count, rowRef, children,
 }: {
   index: string
   label: string
+  sublabel?: string
   open: boolean
   onToggle: () => void
   done: boolean
@@ -1232,8 +1274,11 @@ function AccordionRow({
         className="w-full flex items-center gap-4 py-5 text-left"
       >
         <span className="text-[11px] text-ink-light/45 shrink-0 w-6 tabular-nums" style={CFG_KR}>{index}</span>
-        <span className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <span className="text-[15px] font-bold text-ink" style={CFG_KR}>{label}</span>
+          {sublabel && (
+            <span className="text-[11.5px] font-normal text-ink-light/45" style={CFG_KR}>{sublabel}</span>
+          )}
           {done && selectedLabel && !open && (
             <span className="text-[13px] font-medium" style={{ ...CFG_KR, color: CFG_INK }}>{selectedLabel}</span>
           )}
@@ -1392,45 +1437,126 @@ function CalendarPreview({ ratio }: { ratio: [number, number] }) {
 // 아직 없으면(image: null) "이미지 준비중" placeholder 로 보여주고, 실제 asset이 들어오면
 // DesignOption.image 자리만 채우면 자동으로 실사진으로 바뀐다. 선택 상태는 기존 Estimator
 // selection convention(CFG_SEL_BORDER + CheckDisc)을 그대로 따른다.
-function DesignTile({ design, selected, onSelect }: { design: DesignOption; selected: boolean; onSelect: () => void }) {
+//
+// 원본 사진은 검은 스튜디오 배경 위에 제품이 작게 촬영되어 있어, 비교용 썸네일에서는
+// object-cover + previewScale(§DesignOption 주석)로 중앙을 확대해 제품이 충분히 크게
+// 보이도록 한다. 원본 전체(크롭 없는 실사진)는 우상단 "크게 보기" 버튼 → DesignZoomOverlay에서
+// object-contain으로 확인한다.
+function DesignTile({ design, selected, onSelect, onZoom }: {
+  design: DesignOption; selected: boolean; onSelect: () => void; onZoom: () => void
+}) {
+  // 파일이 아직 없어 404가 나는 경우에도 onError로 감지해 즉시 placeholder로 대체한다 —
+  // 깨진 이미지 아이콘이 그대로 노출되지 않게 한다(§베이직 전용 표지/내지 디자인 시안 주석 참고).
+  const [broken, setBroken] = useState(false)
+  const showImage = !!design.image && !broken
+  const scale = design.previewScale ?? 1
+  const px = design.previewX ?? 0
+  const py = design.previewY ?? 0
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="text-left"
-      style={{
-        border: selected ? CFG_SEL_BORDER : CFG_REST_BORDER,
-        background: selected ? CFG_SEL_BG : '#ffffff',
-        transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-      }}
-      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
-      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="w-full text-left"
+        style={{
+          border: selected ? CFG_SEL_BORDER : CFG_REST_BORDER,
+          background: selected ? CFG_SEL_BG : '#ffffff',
+          transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+        }}
+        onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+        onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+      >
+        {/* 4:3 프레임 — 실제 12장을 3:2/4:3으로 비교해보니 제품(캘린더 전면) 자체의 비율이 4:3에
+            가까워, 4:3이 3:2보다 좌우 여백 없이 더 크게 보여준다(§완료보고). object-cover + scale로
+            검은 스튜디오 배경을 적극적으로 잘라내 "달력 디자인 면"을 카드의 주인공으로 만든다
+            (전체 원본은 크롭 없이 "크게 보기"에서 확인). */}
+        <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '4 / 3', background: '#FBFCF8' }}>
+          {showImage ? (
+            <img
+              src={design.image!} alt={design.label} className="w-full h-full object-cover" draggable={false}
+              style={{ transform: `scale(${scale}) translate(${px}%, ${py}%)`, transformOrigin: 'center center' }}
+              onError={() => setBroken(true)}
+            />
+          ) : (
+            <span className="text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2 px-2.5 py-2">
+          <span className="text-[12.5px] font-medium text-ink" style={CFG_KR}>{design.label}</span>
+          <CheckDisc on={selected} />
+        </div>
+      </button>
+      {showImage && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onZoom() }}
+          aria-label={`${design.label} 크게 보기`}
+          className="absolute flex items-center justify-center"
+          style={{ top: 8, right: 8, width: 36, height: 36, background: 'rgba(20,20,20,0.55)' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+            <path d="M1 5V1H5M9 1H13V5M13 9V13H9M5 13H1V9" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
+// 원본 이미지를 크롭 없이 확인하는 확대 보기 — accordion 애니메이션용 transform(§AccordionRow)이
+// 조상에 걸려 있어 position:fixed가 뷰포트 기준으로 뜨지 않으므로 createPortal로 body에 직접 붙인다.
+// 배경은 반투명(rgba alpha<1)이 아니라 불투명 단색을 쓴다 — Header의 backdrop-blur 레이어와 겹칠 때
+// 알파 블렌딩이 깨져 헤더/뒤 콘텐츠가 그대로 비쳐 보이는 실제 렌더링 버그를 Chromium에서 확인함
+// (z-index·hit-test·DOM은 전부 정상인데 페인트만 깨지는 케이스 — 불투명색으로 전환해 회피).
+function DesignZoomOverlay({ design, onClose }: { design: DesignOption; onClose: () => void }) {
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4 sm:p-8"
+      style={{ zIndex: 200, background: '#0a0a0a' }}
+      onClick={onClose}
     >
-      {/* 실제 캘린더 시안은 대부분 가로형이라 3:2(가로) 비율로 보여준다 — object-contain으로 이미지
-          전체를 crop 없이 확인할 수 있게 한다(세로 카드 + object-cover였던 이전 레이아웃에서 변경). */}
-      <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 2', background: '#FBFCF8' }}>
-        {design.image ? (
-          <img src={design.image} alt={design.label} className="w-full h-full object-contain" draggable={false} />
-        ) : (
-          <span className="text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="닫기"
+        className="absolute flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        style={{ top: 'max(14px, env(safe-area-inset-top, 0px))', right: 14, width: 44, height: 44 }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+          <path d="M3.5 3.5L14.5 14.5M14.5 3.5L3.5 14.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </button>
+      <div className="flex flex-col items-center gap-3" style={{ maxWidth: '100%', maxHeight: '100%' }} onClick={e => e.stopPropagation()}>
+        {design.image && (
+          <img
+            src={design.image} alt={design.label} draggable={false}
+            style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain' }}
+          />
         )}
+        <span className="text-[12px] text-white/60" style={CFG_KR}>{design.label}</span>
       </div>
-      <div className="flex items-center justify-between gap-2 px-2.5 py-2">
-        <span className="text-[12.5px] font-medium text-ink" style={CFG_KR}>{design.label}</span>
-        <CheckDisc on={selected} />
-      </div>
-    </button>
+    </div>,
+    document.body,
   )
 }
 // 6개 시안 grid — 가로형 이미지 비교가 목적이라 2열×3행을 기본으로 쓴다(desktop 우측 column 폭
 // 기준으로 3열은 가로형 이미지가 지나치게 작아져 실측 후 2열로 확정, §완료보고 참고).
 function DesignGrid({ designs, selectedId, onSelect }: { designs: DesignOption[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  const [zoomed, setZoomed] = useState<DesignOption | null>(null)
+  useEffect(() => {
+    if (!zoomed) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomed(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomed])
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {designs.map(d => (
-        <DesignTile key={d.id} design={d} selected={selectedId === d.id} onSelect={() => onSelect(d.id)} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {designs.map(d => (
+          <DesignTile key={d.id} design={d} selected={selectedId === d.id} onSelect={() => onSelect(d.id)} onZoom={() => setZoomed(d)} />
+        ))}
+      </div>
+      {zoomed && <DesignZoomOverlay design={zoomed} onClose={() => setZoomed(null)} />}
+    </>
   )
 }
 
@@ -1474,32 +1600,32 @@ function SizeOptionRow({ opt, selected, disabled, onSelect }: {
 
 // 좌측 preview 하단 — 선택한 표지/내지 디자인을 이미지+이름으로 확인(§15). 실시간 합성은 하지
 // 않고 두 이미지를 나란히 보여주는 최소 구현.
-function SelectedDesignsPreview({ cover, inner }: { cover: DesignOption | null; inner: DesignOption | null }) {
+function SelectedDesignsPreviewSlot({ label, design }: { label: string; design: DesignOption | null }) {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+  const [broken, setBroken] = useState(false)
+  const showImage = !!design?.image && !broken
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>선택한 {label}</p>
+      <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
+        {showImage ? (
+          <img src={design!.image!} alt={design!.label} className="w-full h-full object-cover" draggable={false} onError={() => setBroken(true)} />
+        ) : design ? (
+          <span className="text-[11px] text-ink-light/40 px-2 text-center" style={fontKr}>이미지 준비중</span>
+        ) : (
+          <span className="text-[11.5px] text-ink-light/35 px-2 text-center" style={fontKr}>미선택</span>
+        )}
+      </div>
+      {design && <p className="mt-1 text-[12px] font-medium text-ink" style={fontKr}>{design.label}</p>}
+    </div>
+  )
+}
+function SelectedDesignsPreview({ cover, inner }: { cover: DesignOption | null; inner: DesignOption | null }) {
   if (!cover && !inner) return null
-  const slots: { label: string; design: DesignOption | null }[] = [
-    { label: '표지', design: cover },
-    { label: '내지', design: inner },
-  ]
   return (
     <div className="mt-4 grid grid-cols-2 gap-3">
-      {slots.map(s => (
-        <div key={s.label}>
-          <p className="mb-1.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>선택한 {s.label}</p>
-          <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
-            {s.design ? (
-              s.design.image ? (
-                <img src={s.design.image} alt={s.design.label} className="w-full h-full object-cover" draggable={false} />
-              ) : (
-                <span className="text-[11px] text-ink-light/40 px-2 text-center" style={fontKr}>이미지 준비중</span>
-              )
-            ) : (
-              <span className="text-[11.5px] text-ink-light/35 px-2 text-center" style={fontKr}>미선택</span>
-            )}
-          </div>
-          {s.design && <p className="mt-1 text-[12px] font-medium text-ink" style={fontKr}>{s.design.label}</p>}
-        </div>
-      ))}
+      <SelectedDesignsPreviewSlot label="표지" design={cover} />
+      <SelectedDesignsPreviewSlot label="내지" design={inner} />
     </div>
   )
 }
@@ -1570,12 +1696,12 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   // 01 제작등급 → 02 사이즈 → 03 예상 수량. step 번호는 배열 index(i+1)로 매겨지므로 tier마다
   // 배열 길이가 달라도 별도 재배치 로직 없이 자동으로 이어진다.
   type StepKind = 'tier' | 'cover' | 'inner' | 'size' | 'paper' | 'quantity' | 'option'
-  type StepDef = { key: string; label: string; kind: StepKind; group?: string }
+  type StepDef = { key: string; label: string; sublabel?: string; kind: StepKind; group?: string }
   const steps: StepDef[] = isBasic
     ? [
         { key: 'tier', label: '제작 등급', kind: 'tier' },
-        { key: 'cover', label: '표지 스타일 · 1개 선택', kind: 'cover' },
-        { key: 'inner', label: '내지 디자인 · 1개 선택', kind: 'inner' },
+        { key: 'cover', label: '표지 스타일', sublabel: '6개 중 1개 선택', kind: 'cover' },
+        { key: 'inner', label: '내지 디자인', sublabel: '6개 중 1개 선택', kind: 'inner' },
         { key: 'size', label: '사이즈', kind: 'size' },
         { key: 'paper', label: '종이 사양', kind: 'paper' },
         { key: 'quantity', label: '예상 수량', kind: 'quantity' },
@@ -1791,6 +1917,7 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
                   rowRef={el => { stepRefs.current[s.key] = el }}
                   index={String(i + 1).padStart(2, '0')}
                   label={s.label}
+                  sublabel={s.sublabel}
                   open={openStep === s.key}
                   onToggle={() => setOpenStep(openStep === s.key ? null : s.key)}
                   done={st.done}
