@@ -263,7 +263,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
     id: '2027-graphic', name: '2027 그래픽',
     designs: makeDesignSlots(
       '2027-graphic', 6, n => `/estimator/basic/cover-2027-web/cover-2027-${String(n).padStart(2, '0')}.jpg`,
-      () => ({ scale: 1.62, y: 4, bigScale: 1.58, bigY: 0.6 }),
+      () => ({ scale: 1.62, y: 4, bigScale: 1.95, bigY: 0.6 }),
       n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
     ),
   },
@@ -271,7 +271,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
 // 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
 const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
   'inner', 6, n => `/estimator/basic/interior-web/interior-${String(n).padStart(2, '0')}.jpg`,
-  () => ({ scale: 1.72, y: 3, bigScale: 1.58, bigY: 0.6 }),
+  () => ({ scale: 1.72, y: 3, bigScale: 1.95, bigY: 0.6 }),
   n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
 )
 
