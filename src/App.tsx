@@ -218,9 +218,13 @@ function sizeQuantityExceeded(opt: SizeOption, quantity: number | null) {
 // 사진 전체를 예쁘게 보여주는 게 아니라 타이포/레이아웃/숫자 배열 차이를 빠르게 비교하는 것 —
 // 원본 전체는 "크게 보기" 모달(DesignZoomOverlay)에서 이 값과 무관하게 object-contain으로 본다.
 // 시안마다 촬영 프레이밍이 달라지면 previewX/previewY(퍼센트, translate 기준)로 개별 조정한다.
+// bigPreviewScale/X/Y — 좌측 대형 preview(BigPreviewImage) 전용 확대값. 6개 비교 grid용
+// thumbnail(4:3 박스)과 좌측 대형 preview(더 와이드한 박스, §EstimatorInline 좌측 컬럼)는 컨테이너
+// 비율이 달라 같은 scale이 항상 맞지는 않는다 — 지정하지 않으면 previewScale/X/Y를 그대로 쓴다.
 type DesignOption = {
   id: string; label: string; image: string | null
   previewScale?: number; previewX?: number; previewY?: number
+  bigPreviewScale?: number; bigPreviewX?: number; bigPreviewY?: number
 }
 type CoverDesignFamily = { id: string; name: string; designs: DesignOption[] }
 // framing(n) — 시안 번호(1-base) → 개별 확대/위치값. 12장을 실측한 결과 사진들이 거의 동일한
@@ -229,7 +233,7 @@ type CoverDesignFamily = { id: string; name: string; designs: DesignOption[] }
 function makeDesignSlots(
   prefix: string, count: number,
   imagePath?: (n: number) => string,
-  framing?: (n: number) => { scale?: number; x?: number; y?: number },
+  framing?: (n: number) => { scale?: number; x?: number; y?: number; bigScale?: number; bigX?: number; bigY?: number },
 ): DesignOption[] {
   return Array.from({ length: count }, (_, i) => {
     const n = i + 1
@@ -241,6 +245,9 @@ function makeDesignSlots(
       previewScale: f?.scale,
       previewX: f?.x,
       previewY: f?.y,
+      bigPreviewScale: f?.bigScale,
+      bigPreviewX: f?.bigX,
+      bigPreviewY: f?.bigY,
     }
   })
 }
@@ -250,14 +257,14 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
     id: '2027-graphic', name: '2027 그래픽',
     designs: makeDesignSlots(
       '2027-graphic', 6, n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
-      () => ({ scale: 1.62, y: 4 }),
+      () => ({ scale: 1.62, y: 4, bigScale: 2.05, bigY: 4 }),
     ),
   },
 ]
 // 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
 const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
   'inner', 6, n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
-  () => ({ scale: 1.72, y: 3 }),
+  () => ({ scale: 1.72, y: 3, bigScale: 2.2, bigY: 3 }),
 )
 
 // 베이직 전용 종이 사양 — "미정"을 없애고 실제 제공 사양 중 하나를 반드시 고르게 한다.
@@ -1442,6 +1449,32 @@ function CalendarPreview({ ratio }: { ratio: [number, number] }) {
 // object-cover + previewScale(§DesignOption 주석)로 중앙을 확대해 제품이 충분히 크게
 // 보이도록 한다. 원본 전체(크롭 없는 실사진)는 우상단 "크게 보기" 버튼 → DesignZoomOverlay에서
 // object-contain으로 확인한다.
+// 검은 스튜디오 배경을 잘라내고 제품을 확대해서 보여주는 crop — CSS `transform: scale()`이 아니라
+// img 자체의 width/height를 퍼센트로 키워 object-fit:cover로 렌더링한 뒤 overflow:hidden으로
+// 잘라내는 방식을 쓴다. 기존에는 object-fit:cover로 컨테이너 크기(예: 601×451px)에 맞춰 한 번
+// 다운스케일한 비트맵을, transform:scale(1.6~1.7)로 다시 확대하는 2단계 리샘플링이 되어 5056×3392
+// 원본의 가는 달력 격자선이 뭉개져 사라지는 원인이었다(§완료보고). width/height %로 직접 큰 박스를
+// 잡으면 브라우저가 원본 이미지를 그 최종 해상도로 한 번에 다운스케일하므로 훨씬 선명하다.
+// translate는 (scale/transform 없이) 이동만 하는 연산이라 화질 저하가 없다 — 위치 오프셋은
+// 그대로 translate로 처리한다.
+function CroppedDesignImage({ design, scale, x, y, onError }: {
+  design: DesignOption; scale: number; x: number; y: number; onError: () => void
+}) {
+  return (
+    <img
+      src={design.image!} alt={design.label} draggable={false}
+      className="absolute object-cover"
+      style={{
+        width: `${scale * 100}%`,
+        height: `${scale * 100}%`,
+        left: '50%',
+        top: '50%',
+        transform: `translate(calc(-50% + ${x}%), calc(-50% + ${y}%))`,
+      }}
+      onError={onError}
+    />
+  )
+}
 function DesignTile({ design, selected, onSelect, onZoom }: {
   design: DesignOption; selected: boolean; onSelect: () => void; onZoom: () => void
 }) {
@@ -1470,15 +1503,11 @@ function DesignTile({ design, selected, onSelect, onZoom }: {
             가까워, 4:3이 3:2보다 좌우 여백 없이 더 크게 보여준다(§완료보고). object-cover + scale로
             검은 스튜디오 배경을 적극적으로 잘라내 "달력 디자인 면"을 카드의 주인공으로 만든다
             (전체 원본은 크롭 없이 "크게 보기"에서 확인). */}
-        <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '4 / 3', background: '#FBFCF8' }}>
+        <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3', background: '#FBFCF8' }}>
           {showImage ? (
-            <img
-              src={design.image!} alt={design.label} className="w-full h-full object-cover" draggable={false}
-              style={{ transform: `scale(${scale}) translate(${px}%, ${py}%)`, transformOrigin: 'center center' }}
-              onError={() => setBroken(true)}
-            />
+            <CroppedDesignImage design={design} scale={scale} x={px} y={py} onError={() => setBroken(true)} />
           ) : (
-            <span className="text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
           )}
         </div>
         <div className="flex items-center justify-between gap-2 px-2.5 py-2">
@@ -1598,26 +1627,25 @@ function SizeOptionRow({ opt, selected, disabled, onSelect }: {
   )
 }
 
-// 좌측 대형 preview에 표시되는 표지/내지 원본 이미지 — "지금 편집 중인 디자인"을 크롭 없이
-// object-contain으로 보여준다(§Sincerely 조사: 여러 옵션을 합성한 최종본이 아니라 지금 만지고
-// 있는 항목의 대표 이미지 1장을 보여주는 방식). key={design.id}로 리마운트시켜 디자인이 바뀔
-// 때마다 broken 상태가 새로 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴).
-// 아직 asset이 없거나(image: null) 404인 슬롯은 "이미지 준비중"으로 대체 — 현재 asset은 최종
-// 제작 규격용이 아니므로, 전용 asset이 들어와도 이 컴포넌트는 그대로 유지된다(§11).
+// 좌측 대형 preview에 표시되는 표지/내지 원본 이미지 — "지금 편집 중인 디자인"을 보여준다
+// (§Sincerely 조사: 여러 옵션을 합성한 최종본이 아니라 지금 만지고 있는 항목의 대표 이미지 1장을
+// 보여주는 방식). 원본을 그대로 object-contain으로 보여주면 검은 스튜디오 배경까지 전부 포함돼
+// 실제 제품이 작아 보이므로(§완료보고), DesignTile과 동일한 CroppedDesignImage crop을 재사용해
+// 확대한다 — 다만 이 컨테이너는 4:3 thumbnail보다 훨씬 와이드해서(§EstimatorInline 좌측 컬럼)
+// object-fit:cover 기준 크롭 축(가로/세로)이 thumbnail과 반대라 bigPreviewScale/X/Y로 별도 값을
+// 쓴다(지정 없으면 previewScale/X/Y로 폴백). key={design.id}로 리마운트시켜 디자인이 바뀔 때마다
+// broken 상태가 새로 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴). 아직 asset이
+// 없거나(image: null) 404인 슬롯은 "이미지 준비중"으로 대체 — 현재 asset은 최종 제작 규격용이
+// 아니므로, 전용 asset이 들어와도 이 컴포넌트는 그대로 유지된다(§11).
 function BigPreviewImage({ design }: { design: DesignOption }) {
   const [broken, setBroken] = useState(false)
   if (!design.image || broken) {
     return <span className="text-[12px] text-ink-light/40 px-3 text-center" style={CFG_KR}>이미지 준비중</span>
   }
-  return (
-    <img
-      src={design.image}
-      alt={design.label}
-      draggable={false}
-      className="max-w-full max-h-full object-contain"
-      onError={() => setBroken(true)}
-    />
-  )
+  const scale = design.bigPreviewScale ?? design.previewScale ?? 1
+  const x = design.bigPreviewX ?? design.previewX ?? 0
+  const y = design.bigPreviewY ?? design.previewY ?? 0
+  return <CroppedDesignImage design={design} scale={scale} x={x} y={y} onError={() => setBroken(true)} />
 }
 
 // ── 인라인 견적 계산기 (랜딩 내장용) ────────────────────────────────────────
@@ -1770,19 +1798,21 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   const selectedInnerDesign = INNER_DESIGNS.find(x => x.id === innerDesignId) ?? null
   const selectedSize = d.sizes.find(s => s.id === sizeId) ?? null
 
-  // 표지/내지 단계를 다시 열었을 때(예: 내지까지 고른 뒤 표지를 다시 열어 재확인) 좌측 preview를
-  // 그 단계의 기존 선택값으로 복원한다. 새 시안을 클릭했을 때의 즉시 갱신은 handleCoverDesign/
-  // handleInnerDesign에서 이미 처리하므로, 여기서는 openStep 변화(재오픈)에만 반응한다 —
-  // selectedCoverDesign/selectedInnerDesign을 의존성에 넣으면 advanceFrom이 openStep을 다음
-  // 단계로 이미 옮긴 뒤에도 이 effect가 재평가되며 방금 imperative로 세팅한 값을 되돌릴 수 있다.
-  useEffect(() => {
-    if (openStep === 'cover' && selectedCoverDesign) {
+  // 표지/내지 아코디언 헤더를 "사용자가 직접" 다시 열었을 때만 좌측 preview를 그 단계의 기존
+  // 선택값으로 복원한다(§완료보고 — 이전에는 openStep 변화에 반응하는 useEffect로 처리했는데,
+  // handleCoverDesign이 advanceFrom으로 openStep을 'inner'로 넘기는 것도 같은 "openStep 변화"라
+  // 그 순간 effect가 재평가되며 내지가 이미 선택돼 있으면 방금 고른 표지 preview를 즉시 내지로
+  // 덮어써버리는 버그가 있었다). toggleStep은 헤더 클릭이라는 명시적 사용자 액션에서만 호출되므로
+  // advanceFrom의 자동 다음 단계 이동과 절대 섞이지 않는다.
+  function toggleStep(key: string) {
+    const next = openStep === key ? null : key
+    setOpenStep(next)
+    if (next === 'cover' && selectedCoverDesign) {
       setPreviewDesign({ kind: 'cover', design: selectedCoverDesign })
-    } else if (openStep === 'inner' && selectedInnerDesign) {
+    } else if (next === 'inner' && selectedInnerDesign) {
       setPreviewDesign({ kind: 'inner', design: selectedInnerDesign })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openStep])
+  }
   const selectedPaperLabel = paperSpecId ? (PAPER_SPEC_OPTIONS.find(p => p.id === paperSpecId)?.label ?? null) : null
 
   function stepState(s: StepDef): { done: boolean; selectedLabel: string | null; hint: string; count: string } {
@@ -1904,7 +1934,6 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
             className="relative flex items-center justify-center overflow-hidden"
             style={{
               background: '#FBFCF8',
-              border: '1px solid rgba(26,26,26,0.12)',
               height: 'clamp(420px, 60vh, 680px)',
               padding: 'clamp(20px, 4vw, 48px)',
             }}
@@ -1943,7 +1972,7 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
                   label={s.label}
                   sublabel={s.sublabel}
                   open={openStep === s.key}
-                  onToggle={() => setOpenStep(openStep === s.key ? null : s.key)}
+                  onToggle={() => toggleStep(s.key)}
                   done={st.done}
                   selectedLabel={st.selectedLabel}
                   hint={st.hint}
