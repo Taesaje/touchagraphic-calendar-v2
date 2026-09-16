@@ -262,7 +262,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
   {
     id: '2027-graphic', name: '2027 그래픽',
     designs: makeDesignSlots(
-      '2027-graphic', 6, n => `/estimator/basic/cover-2027-web/cover-2027-${String(n).padStart(2, '0')}.jpg`,
+      '2027-graphic', 6, n => `/estimator/basic/cover-2027-preview/cover-2027-${String(n).padStart(2, '0')}.jpg`,
       () => ({ scale: 1.62, y: 4, bigScale: 1.58, bigY: 0.6 }),
       n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
     ),
@@ -270,7 +270,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
 ]
 // 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
 const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
-  'inner', 6, n => `/estimator/basic/interior-web/interior-${String(n).padStart(2, '0')}.jpg`,
+  'inner', 6, n => `/estimator/basic/interior-preview/interior-${String(n).padStart(2, '0')}.jpg`,
   () => ({ scale: 1.72, y: 3, bigScale: 1.58, bigY: 0.6 }),
   n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
 )
@@ -1453,37 +1453,12 @@ function CalendarPreview({ ratio }: { ratio: [number, number] }) {
 // DesignOption.image 자리만 채우면 자동으로 실사진으로 바뀐다. 선택 상태는 기존 Estimator
 // selection convention(CFG_SEL_BORDER + CheckDisc)을 그대로 따른다.
 //
-// 원본 사진은 검은 스튜디오 배경 위에 제품이 작게 촬영되어 있어, 비교용 썸네일에서는
-// object-cover + previewScale(§DesignOption 주석)로 중앙을 확대해 제품이 충분히 크게
-// 보이도록 한다. 원본 전체(크롭 없는 실사진)는 우상단 "크게 보기" 버튼 → DesignZoomOverlay에서
-// object-contain으로 확인한다.
-// 검은 스튜디오 배경을 잘라내고 제품을 확대해서 보여주는 crop — CSS `transform: scale()`이 아니라
-// img 자체의 width/height를 퍼센트로 키워 object-fit:cover로 렌더링한 뒤 overflow:hidden으로
-// 잘라내는 방식을 쓴다. 기존에는 object-fit:cover로 컨테이너 크기(예: 601×451px)에 맞춰 한 번
-// 다운스케일한 비트맵을, transform:scale(1.6~1.7)로 다시 확대하는 2단계 리샘플링이 되어 5056×3392
-// 원본의 가는 달력 격자선이 뭉개져 사라지는 원인이었다(§완료보고). width/height %로 직접 큰 박스를
-// 잡으면 브라우저가 원본 이미지를 그 최종 해상도로 한 번에 다운스케일하므로 훨씬 선명하다.
-// translate는 (scale/transform 없이) 이동만 하는 연산이라 화질 저하가 없다 — 위치 오프셋은
-// 그대로 translate로 처리한다.
-function CroppedDesignImage({ design, scale, x, y, onError }: {
-  design: DesignOption; scale: number; x: number; y: number; onError: () => void
-}) {
-  return (
-    <img
-      src={design.image!} alt={design.label} draggable={false}
-      decoding="async"
-      className="absolute object-cover"
-      style={{
-        width: `${scale * 100}%`,
-        height: `${scale * 100}%`,
-        left: '50%',
-        top: '50%',
-        transform: `translate(calc(-50% + ${x}%), calc(-50% + ${y}%))`,
-      }}
-      onError={onError}
-    />
-  )
-}
+// 원본 사진은 검은 스튜디오 배경 위에 제품이 작게 촬영되어 있어, 예전에는 object-cover +
+// CSS scale/translate로 썸네일마다 중앙을 다시 확대했다. 이제는 asset 자체가 이미 제품
+// bounding box(±8% safe margin) 기준으로 미리 crop된 "selection preview" 이미지(§완료보고 —
+// cover-2027-preview/interior-preview)라 CSS에서 추가로 확대할 필요가 없다 — object-cover만으로
+// 카드 프레임(4:3)에 자연스럽게 채워진다. 원본 전체(크롭 없는 실사진)는 우상단 "크게 보기" 버튼
+// → DesignZoomOverlay에서 zoomImage(원본)로 확인한다.
 function DesignTile({ design, selected, onSelect, onZoom }: {
   design: DesignOption; selected: boolean; onSelect: () => void; onZoom: () => void
 }) {
@@ -1491,9 +1466,6 @@ function DesignTile({ design, selected, onSelect, onZoom }: {
   // 깨진 이미지 아이콘이 그대로 노출되지 않게 한다(§베이직 전용 표지/내지 디자인 시안 주석 참고).
   const [broken, setBroken] = useState(false)
   const showImage = !!design.image && !broken
-  const scale = design.previewScale ?? 1
-  const px = design.previewX ?? 0
-  const py = design.previewY ?? 0
   return (
     <div className="relative">
       <button
@@ -1514,7 +1486,10 @@ function DesignTile({ design, selected, onSelect, onZoom }: {
             (전체 원본은 크롭 없이 "크게 보기"에서 확인). */}
         <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3', background: '#FBFCF8' }}>
           {showImage ? (
-            <CroppedDesignImage design={design} scale={scale} x={px} y={py} onError={() => setBroken(true)} />
+            <img
+              src={design.image!} alt={design.label} draggable={false} decoding="async"
+              className="w-full h-full object-cover" onError={() => setBroken(true)}
+            />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-[11px] text-ink-light/40 px-2 text-center" style={CFG_KR}>이미지 준비중</span>
           )}
@@ -1636,13 +1611,13 @@ function SizeOptionRow({ opt, selected, disabled, onSelect }: {
   )
 }
 
-// 좌측 대형 preview에 표시되는 표지/내지 원본 이미지 — "지금 편집 중인 디자인"을 보여준다
+// 좌측 대형 preview에 표시되는 표지/내지 이미지 — "지금 편집 중인 디자인"을 보여준다
 // (§Sincerely 조사: 여러 옵션을 합성한 최종본이 아니라 지금 만지고 있는 항목의 대표 이미지 1장을
-// 보여주는 방식). 우측 thumbnail(CroppedDesignImage)은 "빠른 비교"가 목적이라 강하게 crop하지만,
-// 좌측은 "제품 사진 전체를 자연스럽게 확인"하는 영역이라 역할이 다르다(§완료보고) — 여기서는 crop
-// 대신 object-contain으로 원본 구도(상단 링/하단 받침/좌우 끝/검은 배경)를 그대로 보여준다.
-// 좌측 preview container를 원본과 같은 3:2 비율에 맞춰뒀기 때문에 object-contain이어도 레터박스가
-// 거의 생기지 않는다. key={design.id}로 리마운트시켜 디자인이 바뀔 때마다 broken 상태가 새로
+// 보여주는 방식). 이 화면의 목적은 원본 사진 전체 감상이 아니라 "선택한 캘린더 디자인이 크게
+// 보이는 것"이다(§완료보고) — DesignTile과 동일한 selection preview asset(제품 bounding box
+// 기준으로 이미 crop된 cover-2027-preview/interior-preview, 약 1373:1000 비율)을 쓰고, 좌측
+// container도 같은 비율로 맞춰뒀기 때문에 CSS에서 추가 crop/scale 없이 object-contain만으로
+// 프레임을 꽉 채운다. key={design.id}로 리마운트시켜 디자인이 바뀔 때마다 broken 상태가 새로
 // 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴). 아직 asset이 없거나(image: null)
 // 404인 슬롯은 "이미지 준비중"으로 대체.
 function BigPreviewImage({ design }: { design: DesignOption }) {
@@ -1937,27 +1912,26 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
       </div>
 
       {/* ── 2열: 좌 preview(큰 결과 확인 영역) / 우 configurator(선택 영역) ──
-          이전엔 Sincerely 실측(57:43)을 그대로 따라 좌측을 지나치게 와이드하게 잡았더니, 원본
-          사진 비율(약 3:2)과 container 비율이 안 맞아 이미지를 강하게 crop/scale해야 했다
-          (§완료보고). 이번엔 이미지를 프레임에 맞추는 대신 프레임을 이미지/옵션 구조에 맞춰
-          52:48 수준으로 재조정 — 우측 option panel(2열 카드 그리드)이 실제로 쓰기 편해지는 폭을
-          우선한다. */}
+          좌우 column 비율(약 52:48)은 우측 option panel(2열 카드 그리드)이 쓰기 편한 폭을
+          우선해 잡은 값을 그대로 유지한다(§완료보고 — 이번 작업은 layout이 아니라 preview
+          asset/framing 문제였다). */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start pb-4">
         {/* 좌: 캘린더 미리보기 — sticky로 우측을 스크롤해도 화면에 계속 남는다(§Sincerely 조사:
-            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). 원본 사진
-            비율(5056×3392 ≈ 3:2)에 맞춰 container도 3:2로 잡아, 이미지를 crop하지 않고
-            object-contain으로 자연스럽게 보여준다(§BigPreviewImage). */}
+            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). container
+            비율을 selection preview asset(1800×1311, §BigPreviewImage)과 맞춰 CSS crop 없이
+            딱 맞게 채운다. 배경을 밝은 톤(#FBFCF8) 대신 짙은 톤으로 바꾸고 padding을 없애 사진
+            주위에 액자처럼 보이던 여백을 제거했다 — 이제 preview 자체가 "사진 + 프레임"이 아니라
+            화면 하나처럼 보인다. */}
         <div className="lg:sticky lg:top-[104px]">
           <div
             className="relative flex items-center justify-center overflow-hidden"
             style={{
-              background: '#FBFCF8',
-              aspectRatio: '3 / 2',
-              padding: 'clamp(20px, 4vw, 48px)',
+              background: '#0A0A0A',
+              aspectRatio: '1800 / 1311',
             }}
           >
-            <div className="absolute top-3 left-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
-            <div className="absolute bottom-3 right-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
+            <div className="absolute top-3 left-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
+            <div className="absolute bottom-3 right-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
             {/* 표지/내지 중 "지금 편집 중인" 디자인이 있으면 그 원본 이미지를 크게 보여주고,
                 아직 아무것도 고르지 않았다면 기존 와이어프레임 fallback을 그대로 보여준다
                 (§Sincerely 조사: 선택 전 단계를 갑자기 비워두지 않음). */}
