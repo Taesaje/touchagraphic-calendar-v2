@@ -1598,35 +1598,25 @@ function SizeOptionRow({ opt, selected, disabled, onSelect }: {
   )
 }
 
-// 좌측 preview 하단 — 선택한 표지/내지 디자인을 이미지+이름으로 확인(§15). 실시간 합성은 하지
-// 않고 두 이미지를 나란히 보여주는 최소 구현.
-function SelectedDesignsPreviewSlot({ label, design }: { label: string; design: DesignOption | null }) {
-  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
+// 좌측 대형 preview에 표시되는 표지/내지 원본 이미지 — "지금 편집 중인 디자인"을 크롭 없이
+// object-contain으로 보여준다(§Sincerely 조사: 여러 옵션을 합성한 최종본이 아니라 지금 만지고
+// 있는 항목의 대표 이미지 1장을 보여주는 방식). key={design.id}로 리마운트시켜 디자인이 바뀔
+// 때마다 broken 상태가 새로 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴).
+// 아직 asset이 없거나(image: null) 404인 슬롯은 "이미지 준비중"으로 대체 — 현재 asset은 최종
+// 제작 규격용이 아니므로, 전용 asset이 들어와도 이 컴포넌트는 그대로 유지된다(§11).
+function BigPreviewImage({ design }: { design: DesignOption }) {
   const [broken, setBroken] = useState(false)
-  const showImage = !!design?.image && !broken
+  if (!design.image || broken) {
+    return <span className="text-[12px] text-ink-light/40 px-3 text-center" style={CFG_KR}>이미지 준비중</span>
+  }
   return (
-    <div>
-      <p className="mb-1.5 text-[11px] font-medium text-ink-light/50" style={fontKr}>선택한 {label}</p>
-      <div className="overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', background: '#FAFAF8', border: '1px solid rgba(26,26,26,0.10)' }}>
-        {showImage ? (
-          <img src={design!.image!} alt={design!.label} className="w-full h-full object-cover" draggable={false} onError={() => setBroken(true)} />
-        ) : design ? (
-          <span className="text-[11px] text-ink-light/40 px-2 text-center" style={fontKr}>이미지 준비중</span>
-        ) : (
-          <span className="text-[11.5px] text-ink-light/35 px-2 text-center" style={fontKr}>미선택</span>
-        )}
-      </div>
-      {design && <p className="mt-1 text-[12px] font-medium text-ink" style={fontKr}>{design.label}</p>}
-    </div>
-  )
-}
-function SelectedDesignsPreview({ cover, inner }: { cover: DesignOption | null; inner: DesignOption | null }) {
-  if (!cover && !inner) return null
-  return (
-    <div className="mt-4 grid grid-cols-2 gap-3">
-      <SelectedDesignsPreviewSlot label="표지" design={cover} />
-      <SelectedDesignsPreviewSlot label="내지" design={inner} />
-    </div>
+    <img
+      src={design.image}
+      alt={design.label}
+      draggable={false}
+      className="max-w-full max-h-full object-contain"
+      onError={() => setBroken(true)}
+    />
   )
 }
 
@@ -1659,6 +1649,12 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   // ── configurator UI state (표시 전용, 계산과 분리) ──
   const [openStep, setOpenStep] = useState<string | null>('tier')
   const stepRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // 좌측 대형 preview에 지금 보여줄 디자인(§Sincerely 조사: "지금 편집 중인 항목"을 보여주는
+  // 방식). 표지/내지 시안을 새로 클릭하면 handleCoverDesign/handleInnerDesign에서 즉시 갱신하고,
+  // 이미 선택해둔 단계를 다시 열면(아래 useEffect) 그 단계의 선택값으로 복원한다. 둘 다 비어있는
+  // 초기 상태에서는 null → 기존 와이어프레임 CalendarPreview를 그대로 fallback으로 보여준다.
+  const [previewDesign, setPreviewDesign] = useState<{ kind: 'cover' | 'inner'; design: DesignOption } | null>(null)
 
   const d = TIER_DATA[tier]
   const isBasic = tier === 'template'
@@ -1748,10 +1744,15 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   }
   function handleCoverDesign(designId: string) {
     setCoverDesignId(designId)
+    const family = COVER_DESIGN_FAMILIES.find(f => f.id === coverFamilyId)
+    const design = family?.designs.find(x => x.id === designId) ?? null
+    if (design) setPreviewDesign({ kind: 'cover', design })
     advanceFrom('cover')
   }
   function handleInnerDesign(designId: string) {
     setInnerDesignId(designId)
+    const design = INNER_DESIGNS.find(x => x.id === designId) ?? null
+    if (design) setPreviewDesign({ kind: 'inner', design })
     advanceFrom('inner')
   }
   function handleSize(id: string) {
@@ -1768,6 +1769,20 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   const selectedCoverDesign = selectedCoverFamily?.designs.find(x => x.id === coverDesignId) ?? null
   const selectedInnerDesign = INNER_DESIGNS.find(x => x.id === innerDesignId) ?? null
   const selectedSize = d.sizes.find(s => s.id === sizeId) ?? null
+
+  // 표지/내지 단계를 다시 열었을 때(예: 내지까지 고른 뒤 표지를 다시 열어 재확인) 좌측 preview를
+  // 그 단계의 기존 선택값으로 복원한다. 새 시안을 클릭했을 때의 즉시 갱신은 handleCoverDesign/
+  // handleInnerDesign에서 이미 처리하므로, 여기서는 openStep 변화(재오픈)에만 반응한다 —
+  // selectedCoverDesign/selectedInnerDesign을 의존성에 넣으면 advanceFrom이 openStep을 다음
+  // 단계로 이미 옮긴 뒤에도 이 effect가 재평가되며 방금 imperative로 세팅한 값을 되돌릴 수 있다.
+  useEffect(() => {
+    if (openStep === 'cover' && selectedCoverDesign) {
+      setPreviewDesign({ kind: 'cover', design: selectedCoverDesign })
+    } else if (openStep === 'inner' && selectedInnerDesign) {
+      setPreviewDesign({ kind: 'inner', design: selectedInnerDesign })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openStep])
   const selectedPaperLabel = paperSpecId ? (PAPER_SPEC_OPTIONS.find(p => p.id === paperSpecId)?.label ?? null) : null
 
   function stepState(s: StepDef): { done: boolean; selectedLabel: string | null; hint: string; count: string } {
@@ -1877,22 +1892,33 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
         </div>
       </div>
 
-      {/* ── 2열: 좌 preview / 우 configurator ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start pb-4">
-        {/* 좌: 캘린더 미리보기 */}
+      {/* ── 2열: 좌 preview(큰 결과 확인 영역) / 우 configurator(선택 영역) ──
+          비율은 Sincerely 실측(좌 627px : 우 501px ≈ 57:43)을 참고해 좌측을 시각적으로 확실히
+          크게 잡는다(§Sincerely 조사 보고 §1). 우측 accordion 폭/썸네일 그리드는 그대로 유지 —
+          "우측은 선택하기 좋은 영역, 좌측은 크게 확인하는 영역"으로 역할만 나눈다. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start pb-4">
+        {/* 좌: 캘린더 미리보기 — sticky로 우측을 스크롤해도 화면에 계속 남는다(§Sincerely 조사:
+            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). */}
         <div className="lg:sticky lg:top-[104px]">
           <div
             className="relative flex items-center justify-center overflow-hidden"
             style={{
               background: '#FBFCF8',
               border: '1px solid rgba(26,26,26,0.12)',
-              minHeight: 'clamp(260px, 40vh, 520px)',
-              padding: 'clamp(24px, 5vw, 56px)',
+              height: 'clamp(420px, 60vh, 680px)',
+              padding: 'clamp(20px, 4vw, 48px)',
             }}
           >
             <div className="absolute top-3 left-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
             <div className="absolute bottom-3 right-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
-            <CalendarPreview ratio={previewRatio} />
+            {/* 표지/내지 중 "지금 편집 중인" 디자인이 있으면 그 원본 이미지를 크게 보여주고,
+                아직 아무것도 고르지 않았다면 기존 와이어프레임 fallback을 그대로 보여준다
+                (§Sincerely 조사: 선택 전 단계를 갑자기 비워두지 않음). */}
+            {previewDesign ? (
+              <BigPreviewImage key={previewDesign.design.id} design={previewDesign.design} />
+            ) : (
+              <CalendarPreview ratio={previewRatio} />
+            )}
           </div>
           <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-ink/20 pt-3">
             <div className="min-w-0">
@@ -1902,8 +1928,6 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
               </p>
             </div>
           </div>
-
-          {isBasic && <SelectedDesignsPreview cover={selectedCoverDesign} inner={selectedInnerDesign} />}
         </div>
 
         {/* 우: progressive accordion */}
