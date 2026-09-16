@@ -223,6 +223,10 @@ function sizeQuantityExceeded(opt: SizeOption, quantity: number | null) {
 // 비율이 달라 같은 scale이 항상 맞지는 않는다 — 지정하지 않으면 previewScale/X/Y를 그대로 쓴다.
 type DesignOption = {
   id: string; label: string; image: string | null
+  // 크게 보기(DesignZoomOverlay) 전용 원본 고해상도 파일. thumbnail/좌측 preview는 항상
+  // web-optimized `image`(약 1800px 긴 변, ~70-115KB)를 써서 클릭 시 대형 원본(5056×3392,
+  // 3-5MB)을 매번 다시 decode하느라 생기던 렉을 없앤다(§완료보고). 없으면 image로 폴백.
+  zoomImage?: string | null
   previewScale?: number; previewX?: number; previewY?: number
   bigPreviewScale?: number; bigPreviewX?: number; bigPreviewY?: number
 }
@@ -234,6 +238,7 @@ function makeDesignSlots(
   prefix: string, count: number,
   imagePath?: (n: number) => string,
   framing?: (n: number) => { scale?: number; x?: number; y?: number; bigScale?: number; bigX?: number; bigY?: number },
+  zoomImagePath?: (n: number) => string,
 ): DesignOption[] {
   return Array.from({ length: count }, (_, i) => {
     const n = i + 1
@@ -242,6 +247,7 @@ function makeDesignSlots(
       id: `${prefix}-${n}`,
       label: `시안 ${String(n).padStart(2, '0')}`,
       image: imagePath ? imagePath(n) : null,
+      zoomImage: zoomImagePath ? zoomImagePath(n) : null,
       previewScale: f?.scale,
       previewX: f?.x,
       previewY: f?.y,
@@ -256,15 +262,17 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
   {
     id: '2027-graphic', name: '2027 그래픽',
     designs: makeDesignSlots(
-      '2027-graphic', 6, n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
+      '2027-graphic', 6, n => `/estimator/basic/cover-2027-web/cover-2027-${String(n).padStart(2, '0')}.jpg`,
       () => ({ scale: 1.62, y: 4, bigScale: 1.58, bigY: 0.6 }),
+      n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
     ),
   },
 ]
 // 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
 const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
-  'inner', 6, n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
+  'inner', 6, n => `/estimator/basic/interior-web/interior-${String(n).padStart(2, '0')}.jpg`,
   () => ({ scale: 1.72, y: 3, bigScale: 1.58, bigY: 0.6 }),
+  n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
 )
 
 // 베이직 전용 종이 사양 — "미정"을 없애고 실제 제공 사양 중 하나를 반드시 고르게 한다.
@@ -1463,6 +1471,7 @@ function CroppedDesignImage({ design, scale, x, y, onError }: {
   return (
     <img
       src={design.image!} alt={design.label} draggable={false}
+      decoding="async"
       className="absolute object-cover"
       style={{
         width: `${scale * 100}%`,
@@ -1557,7 +1566,7 @@ function DesignZoomOverlay({ design, onClose }: { design: DesignOption; onClose:
       <div className="flex flex-col items-center gap-3" style={{ maxWidth: '100%', maxHeight: '100%' }} onClick={e => e.stopPropagation()}>
         {design.image && (
           <img
-            src={design.image} alt={design.label} draggable={false}
+            src={design.zoomImage || design.image} alt={design.label} draggable={false}
             style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain' }}
           />
         )}
