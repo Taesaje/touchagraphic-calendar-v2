@@ -263,7 +263,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
     id: '2027-graphic', name: '2027 그래픽',
     designs: makeDesignSlots(
       '2027-graphic', 6, n => `/estimator/basic/cover-2027-web/cover-2027-${String(n).padStart(2, '0')}.jpg`,
-      () => ({ scale: 1.62, y: 4, bigScale: 1.95, bigY: 0.6 }),
+      () => ({ scale: 1.62, y: 4, bigScale: 1.58, bigY: 0.6 }),
       n => `/estimator/basic/cover-2027/cover-2027-${String(n).padStart(2, '0')}.jpg`,
     ),
   },
@@ -271,7 +271,7 @@ const COVER_DESIGN_FAMILIES: CoverDesignFamily[] = [
 // 내지는 "사진"이 아니라 "내지 페이지"를 비교하는 게 목적이라 표지보다 더 과감하게 확대한다.
 const INNER_DESIGNS: DesignOption[] = makeDesignSlots(
   'inner', 6, n => `/estimator/basic/interior-web/interior-${String(n).padStart(2, '0')}.jpg`,
-  () => ({ scale: 1.72, y: 3, bigScale: 1.95, bigY: 0.6 }),
+  () => ({ scale: 1.72, y: 3, bigScale: 1.58, bigY: 0.6 }),
   n => `/estimator/basic/interior/interior-${String(n).padStart(2, '0')}.jpg`,
 )
 
@@ -1638,23 +1638,28 @@ function SizeOptionRow({ opt, selected, disabled, onSelect }: {
 
 // 좌측 대형 preview에 표시되는 표지/내지 원본 이미지 — "지금 편집 중인 디자인"을 보여준다
 // (§Sincerely 조사: 여러 옵션을 합성한 최종본이 아니라 지금 만지고 있는 항목의 대표 이미지 1장을
-// 보여주는 방식). 원본을 그대로 object-contain으로 보여주면 검은 스튜디오 배경까지 전부 포함돼
-// 실제 제품이 작아 보이므로(§완료보고), DesignTile과 동일한 CroppedDesignImage crop을 재사용해
-// 확대한다 — 다만 이 컨테이너는 4:3 thumbnail보다 훨씬 와이드해서(§EstimatorInline 좌측 컬럼)
-// object-fit:cover 기준 크롭 축(가로/세로)이 thumbnail과 반대라 bigPreviewScale/X/Y로 별도 값을
-// 쓴다(지정 없으면 previewScale/X/Y로 폴백). key={design.id}로 리마운트시켜 디자인이 바뀔 때마다
-// broken 상태가 새로 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴). 아직 asset이
-// 없거나(image: null) 404인 슬롯은 "이미지 준비중"으로 대체 — 현재 asset은 최종 제작 규격용이
-// 아니므로, 전용 asset이 들어와도 이 컴포넌트는 그대로 유지된다(§11).
+// 보여주는 방식). 우측 thumbnail(CroppedDesignImage)은 "빠른 비교"가 목적이라 강하게 crop하지만,
+// 좌측은 "제품 사진 전체를 자연스럽게 확인"하는 영역이라 역할이 다르다(§완료보고) — 여기서는 crop
+// 대신 object-contain으로 원본 구도(상단 링/하단 받침/좌우 끝/검은 배경)를 그대로 보여준다.
+// 좌측 preview container를 원본과 같은 3:2 비율에 맞춰뒀기 때문에 object-contain이어도 레터박스가
+// 거의 생기지 않는다. key={design.id}로 리마운트시켜 디자인이 바뀔 때마다 broken 상태가 새로
+// 초기화되게 한다(§DesignTile과 동일한 onError placeholder 패턴). 아직 asset이 없거나(image: null)
+// 404인 슬롯은 "이미지 준비중"으로 대체.
 function BigPreviewImage({ design }: { design: DesignOption }) {
   const [broken, setBroken] = useState(false)
   if (!design.image || broken) {
     return <span className="text-[12px] text-ink-light/40 px-3 text-center" style={CFG_KR}>이미지 준비중</span>
   }
-  const scale = design.bigPreviewScale ?? design.previewScale ?? 1
-  const x = design.bigPreviewX ?? design.previewX ?? 0
-  const y = design.bigPreviewY ?? design.previewY ?? 0
-  return <CroppedDesignImage design={design} scale={scale} x={x} y={y} onError={() => setBroken(true)} />
+  return (
+    <img
+      src={design.image}
+      alt={design.label}
+      draggable={false}
+      decoding="async"
+      className="max-w-full max-h-full object-contain"
+      onError={() => setBroken(true)}
+    />
+  )
 }
 
 // ── 인라인 견적 계산기 (랜딩 내장용) ────────────────────────────────────────
@@ -1932,18 +1937,22 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
       </div>
 
       {/* ── 2열: 좌 preview(큰 결과 확인 영역) / 우 configurator(선택 영역) ──
-          비율은 Sincerely 실측(좌 627px : 우 501px ≈ 57:43)을 참고해 좌측을 시각적으로 확실히
-          크게 잡는다(§Sincerely 조사 보고 §1). 우측 accordion 폭/썸네일 그리드는 그대로 유지 —
-          "우측은 선택하기 좋은 영역, 좌측은 크게 확인하는 영역"으로 역할만 나눈다. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start pb-4">
+          이전엔 Sincerely 실측(57:43)을 그대로 따라 좌측을 지나치게 와이드하게 잡았더니, 원본
+          사진 비율(약 3:2)과 container 비율이 안 맞아 이미지를 강하게 crop/scale해야 했다
+          (§완료보고). 이번엔 이미지를 프레임에 맞추는 대신 프레임을 이미지/옵션 구조에 맞춰
+          52:48 수준으로 재조정 — 우측 option panel(2열 카드 그리드)이 실제로 쓰기 편해지는 폭을
+          우선한다. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start pb-4">
         {/* 좌: 캘린더 미리보기 — sticky로 우측을 스크롤해도 화면에 계속 남는다(§Sincerely 조사:
-            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). */}
+            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). 원본 사진
+            비율(5056×3392 ≈ 3:2)에 맞춰 container도 3:2로 잡아, 이미지를 crop하지 않고
+            object-contain으로 자연스럽게 보여준다(§BigPreviewImage). */}
         <div className="lg:sticky lg:top-[104px]">
           <div
             className="relative flex items-center justify-center overflow-hidden"
             style={{
               background: '#FBFCF8',
-              height: 'clamp(420px, 60vh, 680px)',
+              aspectRatio: '3 / 2',
               padding: 'clamp(20px, 4vw, 48px)',
             }}
           >
