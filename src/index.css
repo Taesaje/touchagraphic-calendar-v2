@@ -135,6 +135,32 @@ body {
   .cl-logo, .cl-logo-blend { transition: none; }
 }
 
+/* Clients marquee — 기존 touchagraphic.com about 페이지의 client logo 영역(Swiper 기반 무한
+   가로 스크롤)에서 "끊김 없이 오른쪽→왼쪽으로 흐르는 속도감/리듬"만 가져온다. 실제 구현은
+   라이브러리 없이 CSS transform만으로: 동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼
+   옮기면 이음매 없이 반복된다(§완료보고). JS rAF로 매 프레임 갱신하지 않아 12개 로고 애니메이션
+   비용이 거의 0에 가깝다. */
+.clients-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+}
+.clients-track {
+  display: flex;
+  width: max-content;
+  animation: clients-marquee 42s linear infinite;
+}
+@keyframes clients-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .clients-marquee:hover .clients-track { animation-play-state: paused; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clients-track { animation: none; }
+}
+
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
 .pf-feed-item {
   animation: pfFeedFadeIn 220ms ease both;

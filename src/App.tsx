@@ -2398,6 +2398,30 @@ function CertificationSection() {
   )
 }
 
+// 로고 한 칸 — box/card 없이 넓은 가로 field 위에 로고 자체가 놓이는 느낌을 위해 배경/테두리
+// 없이 높이 기준으로만 정렬한다(§완료보고 — touchagraphic.com 홈페이지처럼). 원본 비율이 제각각이라
+// width는 강제하지 않고 height 기준 + object-contain으로 맞추고, 로고별 캔버스 여백 차이는
+// CLIENTS의 scale 값으로만 보정한다.
+function ClientLogoCell({ c }: { c: ClientLogo }) {
+  return (
+    <div className="h-[40px] lg:h-[52px] flex items-center justify-center shrink-0 px-8 lg:px-12">
+      {c.ideaSrc && c.doitSrc ? (
+        <div className="flex items-center gap-2 lg:gap-2.5 h-full">
+          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" draggable={false} />
+          <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" draggable={false} />
+        </div>
+      ) : (
+        <img
+          src={c.src}
+          alt={c.name}
+          draggable={false}
+          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} max-h-full w-auto object-contain`}
+          style={c.scale && c.scale !== 1 ? { transform: `scale(${c.scale})` } : undefined}
+        />
+      )}
+    </div>
+  )
+}
 function Clients() {
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
@@ -2420,27 +2444,18 @@ function Clients() {
           </h2>
           <p className="t-body text-black/50">기업과 기관의 달력 제작을 함께해왔습니다.</p>
         </div>
+      </div>
 
-        <div className="mt-8 lg:mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          {CLIENTS.map(c => (
-            <div
-              key={c.name}
-              className="h-[112px] lg:h-[152px] rounded-[8px] bg-black/[0.035] flex items-center justify-center overflow-hidden px-6 lg:px-8"
-            >
-              {c.ideaSrc && c.doitSrc ? (
-                <div className="flex items-center gap-2 lg:gap-2.5 h-full w-full justify-center">
-                  <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" style={{ maxWidth: '46%' }} />
-                  <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" style={{ maxWidth: '46%' }} />
-                </div>
-              ) : (
-                <img
-                  src={c.src}
-                  alt={c.name}
-                  className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} max-w-full max-h-full w-auto h-auto object-contain`}
-                  style={c.scale && c.scale !== 1 ? { transform: `scale(${c.scale})` } : undefined}
-                />
-              )}
-            </div>
+      {/* Institution/Brand로 나누지 않고 12개 로고를 하나의 흐름으로 이어 보여준다(§완료보고).
+          reference(touchagraphic.com about 페이지)의 client logo 영역은 Swiper 기반 무한 가로
+          marquee였다 — 같은 "끊김 없이 오른쪽에서 왼쪽으로 흐르는" concept만 순수 CSS
+          transform(.clients-track, index.css)으로 재구현했다. 동일 로고 세트를 두 번 이어붙여
+          -50% translateX로 이음매 없이 반복한다. section 좌우 gutter 밖까지(SHELL 밖) 자연스럽게
+          흐르도록 이 트랙만 SHELL 바깥에 둔다. */}
+      <div className="clients-marquee mt-8 lg:mt-10 border-y border-black/10 py-5 lg:py-7">
+        <div className="clients-track">
+          {[...CLIENTS, ...CLIENTS].map((c, i) => (
+            <ClientLogoCell key={`${c.name}-${i}`} c={c} />
           ))}
         </div>
       </div>
