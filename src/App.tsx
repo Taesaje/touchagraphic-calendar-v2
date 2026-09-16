@@ -1786,6 +1786,10 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   const selectedCoverDesign = selectedCoverFamily?.designs.find(x => x.id === coverDesignId) ?? null
   const selectedInnerDesign = INNER_DESIGNS.find(x => x.id === innerDesignId) ?? null
   const selectedSize = d.sizes.find(s => s.id === sizeId) ?? null
+  // 표지/내지 중 실제로 "선택 완료"된 디자인이 하나라도 있을 때만 좌측을 검은 selection preview로
+  // 전환한다(§완료보고) — accordion이 열려 있는지와는 무관하다. 둘 다 미선택인 초기 대기 화면은
+  // §완료보고에서 Git history(commit 341e391)로 복원한 원래 standby container를 그대로 쓴다.
+  const hasSelectedDesign = !!selectedCoverDesign || !!selectedInnerDesign
 
   // 표지/내지 아코디언 헤더를 "사용자가 직접" 다시 열었을 때만 좌측 preview를 그 단계의 기존
   // 선택값으로 복원한다(§완료보고 — 이전에는 openStep 변화에 반응하는 useEffect로 처리했는데,
@@ -1917,30 +1921,38 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
           asset/framing 문제였다). */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start pb-4">
         {/* 좌: 캘린더 미리보기 — sticky로 우측을 스크롤해도 화면에 계속 남는다(§Sincerely 조사:
-            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). container
-            비율을 selection preview asset(1800×1311, §BigPreviewImage)과 맞춰 CSS crop 없이
-            딱 맞게 채운다. 배경을 밝은 톤(#FBFCF8) 대신 짙은 톤으로 바꾸고 padding을 없애 사진
-            주위에 액자처럼 보이던 여백을 제거했다 — 이제 preview 자체가 "사진 + 프레임"이 아니라
-            화면 하나처럼 보인다. */}
+            좌측 preview가 sticky여서 옵션을 고르는 동안 항상 결과를 확인할 수 있음). standby(표지/
+            내지 둘 다 미선택)와 selected(하나라도 선택)는 서로 다른 목적의 화면이라 container
+            자체를 분리한다(§완료보고) — standby는 원래 쓰던 밝은 배경 wireframe 대기 화면
+            (commit 341e391 기준으로 복원), selected는 검은 배경 + selection preview asset 전용
+            프레이밍(1800×1311, §BigPreviewImage)을 그대로 쓴다. */}
         <div className="lg:sticky lg:top-[104px]">
-          <div
-            className="relative flex items-center justify-center overflow-hidden"
-            style={{
-              background: '#0A0A0A',
-              aspectRatio: '1800 / 1311',
-            }}
-          >
-            <div className="absolute top-3 left-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
-            <div className="absolute bottom-3 right-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
-            {/* 표지/내지 중 "지금 편집 중인" 디자인이 있으면 그 원본 이미지를 크게 보여주고,
-                아직 아무것도 고르지 않았다면 기존 와이어프레임 fallback을 그대로 보여준다
-                (§Sincerely 조사: 선택 전 단계를 갑자기 비워두지 않음). */}
-            {previewDesign ? (
-              <BigPreviewImage key={previewDesign.design.id} design={previewDesign.design} />
-            ) : (
+          {hasSelectedDesign ? (
+            <div
+              className="relative flex items-center justify-center overflow-hidden"
+              style={{
+                background: '#0A0A0A',
+                aspectRatio: '1800 / 1311',
+              }}
+            >
+              <div className="absolute top-3 left-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
+              <div className="absolute bottom-3 right-3" style={{ opacity: 0.35 }}><RegMark size={15} color="#ffffff" /></div>
+              {previewDesign && <BigPreviewImage key={previewDesign.design.id} design={previewDesign.design} />}
+            </div>
+          ) : (
+            <div
+              className="relative flex items-center justify-center overflow-hidden"
+              style={{
+                background: '#FBFCF8',
+                height: 'clamp(420px, 60vh, 680px)',
+                padding: 'clamp(20px, 4vw, 48px)',
+              }}
+            >
+              <div className="absolute top-3 left-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
+              <div className="absolute bottom-3 right-3" style={{ opacity: 0.14 }}><RegMark size={15} color="#1A1A1A" /></div>
               <CalendarPreview ratio={previewRatio} />
-            )}
-          </div>
+            </div>
+          )}
           <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-ink/20 pt-3">
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-ink-light/55" style={fontKr}>{d.name}</p>
