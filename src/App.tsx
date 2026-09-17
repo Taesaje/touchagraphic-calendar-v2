@@ -1144,18 +1144,20 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. PHASE 1 heading(0) →
-                PHASE 2 caption/컨트롤(250) → PHASE 3 rail(520) → PHASE 4 첫 카드(680+, §완료보고
-                2차 — 같은 화면 안 hierarchy를 명확한 time sequence로 분리). */}
+            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. trigger(standardIO,
+                -24%)는 Hero와 동일하게 유지 — Portfolio가 더 일찍 시작하지는 않는다. PHASE 1
+                heading(0) → PHASE 2 caption/컨트롤(200) → PHASE 3 rail(430) → PHASE 4 첫 카드
+                (570+, §완료보고 4차 — 2차(250/520/680) 대비 내부 전개만 약 15~20% 압축,
+                trigger 시점은 불변). */}
             <h2
               className="text-black"
               style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
             >
               <RevealLines lines={['제작 사례']} />
             </h2>
-            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="250">Portfolio</span>
+            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="200">Portfolio</span>
           </div>
-          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="250">
+          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="200">
             {/* prev/next — 데스크톱 전용, hairline circle. 모바일은 스와이프에 위임 */}
             <div className="hidden lg:flex items-center gap-2">
               <button
@@ -1210,7 +1212,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
         }}
         className="mt-1 lg:mt-[20px] [&::-webkit-scrollbar]:hidden"
         data-reveal="up"
-        data-reveal-delay="520"
+        data-reveal-delay="430"
       >
         <div
           ref={trackRef}
@@ -1221,11 +1223,11 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
               복제 세트(clone)는 스크린리더 중복 방지를 위해 aria-hidden 처리. */}
           {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => {
             const isClone = i >= PORTFOLIO.length
-            // PHASE 4 — rail(520ms) 다음 처음 보이는 실카드 4개만 120ms 간격 stagger(§완료보고
-            // 2차). clone·나머지 카드는 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft
-            // 실측)에 영향 없이 그대로 보인다.
+            // PHASE 4 — rail(430ms) 다음 처음 보이는 실카드 4개만 105ms 간격 stagger(§완료보고
+            // 4차 — 2차(680+120) 대비 내부 전개만 압축, trigger는 그대로). clone·나머지 카드는
+            // 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft 실측)에 영향 없이 그대로 보인다.
             const revealProps = !isClone && i < 4
-              ? { 'data-reveal': 'up', 'data-reveal-delay': String(680 + staggerMs(i, 120, 400)) }
+              ? { 'data-reveal': 'up', 'data-reveal-delay': String(570 + staggerMs(i, 105, 330)) }
               : {}
             return (
             <button
