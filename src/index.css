@@ -133,7 +133,8 @@ body {
 /* Clients marquee — reference(touchagraphic.com about-us)의 Institution/Brand 두
    .marquee-container(실제 Swiper 기반 무한 가로 autoplay)를 순수 CSS transform으로 재현한다.
    동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼 옮기면 이음매 없이 반복된다. JS rAF 없이
-   애니메이션 비용이 거의 0에 가깝다. 두 row 속도를 다르게(42s / 47s) 해 단조로움을 깬다. */
+   애니메이션 비용이 거의 0에 가깝다. V2 전체가 차분한 editorial 톤이라 reference보다 느리게
+   (52s / 58s, 차이 6s) 흘려 "여유 있게 지나가는" 인상을 준다(§완료보고 — 42s/47s에서 조정).*/
 .clients-marquee {
   overflow: hidden;
 }
@@ -144,8 +145,8 @@ body {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
-.clients-track-a { animation-duration: 42s; }
-.clients-track-b { animation-duration: 47s; }
+.clients-track-a { animation-duration: 52s; }
+.clients-track-b { animation-duration: 58s; }
 @keyframes clients-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -155,42 +156,6 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .clients-track { animation: none; }
-}
-/* reference .about-sec03 .tit-sec .round-text 실측(18px/600, border 0.8px, height 42,
-   padding 0 12px, color rgba(3,3,3,.7)) — "OUR PARTNER." 옆의 작은 설명 capsule. */
-.partner-pill {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border: 0.8px solid #000;
-  border-radius: 9999px;
-  background: #fff;
-  color: rgba(3, 3, 3, 0.7);
-  height: 36px;
-  padding: 0 12px;
-  font-weight: 600;
-  font-size: 14px;
-  white-space: nowrap;
-}
-@media (min-width: 1024px) {
-  .partner-pill { height: 42px; font-size: 18px; }
-}
-/* reference .marquee-container .tit-sec01 .round-text 실측(20px/600, border 1px, height 44,
-   padding 0 16px) — Institution/Brand 각 row 제목 옆 설명 capsule. */
-.clients-row-pill {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border: 1px solid #000;
-  border-radius: 9999px;
-  padding: 0 16px;
-  height: 38px;
-  font-weight: 600;
-  font-size: 15px;
-  white-space: nowrap;
-}
-@media (min-width: 1024px) {
-  .clients-row-pill { height: 44px; font-size: 20px; }
 }
 
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
