@@ -2318,6 +2318,14 @@ const CLIENTS: ClientLogo[] = [
   { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
   { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
+// reference(touchagraphic.com about-us .about-sec03)는 OUR PARTNER. 아래에 Institution/Brand
+// 두 개의 독립된 .marquee-container를 갖는다 — 실제 기관/기업 성격 기준으로 분리(§완료보고).
+const INSTITUTION_NAMES = new Set([
+  '함평군 농업기술센터', '한국수목원정원관리원', '대한상공회의소',
+  '경기도중독관리통합지원센터', '한국가스기술공사', '한국환경산업기술원', '대구오페라하우스',
+])
+const INSTITUTION_CLIENTS = CLIENTS.filter(c => INSTITUTION_NAMES.has(c.name))
+const BRAND_CLIENTS = CLIENTS.filter(c => !INSTITUTION_NAMES.has(c.name))
 
 // ── CERTIFICATIONS ────────────────────────────────────────────────────────────
 // 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
@@ -2406,11 +2414,12 @@ function CertificationSection() {
 // 캔버스에 맞춰 미리 크롭돼 있지 않아 cover를 쓰면 로고가 잘린다. 원본을 임의로 재가공하지 않기
 // 위해 object-contain + height 기준 정렬을 유지한다). 로고별 캔버스 여백 차이는 CLIENTS의 scale
 // 값으로만 보정한다.
-// 고정 logo slot — 모든 로고를 같은 크기의 보이지 않는 프레임(width/height 고정) 안에 놓고
-// object-contain으로 담아 "같은 px 높이"가 아니라 "같은 optical 무게"로 보이게 한다(§완료보고).
-// slot 자체의 폭이 로고 간 가로 gap 역할을 겸해서 별도 px 패딩은 쓰지 않는다.
-const CLIENT_SLOT = 'w-[180px] lg:w-[210px] h-[46px] lg:h-[52px] flex items-center justify-center shrink-0'
-const CLIENT_LOGO_SIZE = 'max-h-[26px] lg:max-h-[34px] max-w-[150px] lg:max-w-[180px]'
+// 고정 logo slot — reference(.item-marquee, 250×90 box + object-fit:cover)와 같은 원리로
+// 모든 로고를 같은 크기의 보이지 않는 프레임 안에 놓고 object-contain으로 담아 "같은 px 높이"가
+// 아니라 "같은 optical 무게"로 보이게 한다. 우리 asset은 reference처럼 캔버스에 맞춰 미리
+// 크롭돼 있지 않아 cover 대신 contain을 쓴다(§완료보고). slot 폭이 로고 간 가로 gap을 겸한다.
+const CLIENT_SLOT = 'w-[190px] lg:w-[220px] h-[56px] lg:h-[74px] flex items-center justify-center shrink-0'
+const CLIENT_LOGO_SIZE = 'max-h-[34px] lg:max-h-[46px] max-w-[160px] lg:max-w-[190px]'
 function ClientLogoCell({ c }: { c: ClientLogo }) {
   const scale = c.scale ?? 1
   return (
@@ -2418,9 +2427,9 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
       {c.ideaSrc && c.doitSrc ? (
         // IDEA/DO IT 두 asset 조합 전체가 다른 로고 하나와 같은 slot 안에 들어가야 하므로,
         // 개별 이미지 max-width를 slot 폭의 절반 수준으로 나눠 캡한다(§완료보고).
-        <div className="flex items-center gap-1.5 lg:gap-2 max-h-[26px] lg:max-h-[34px]">
-          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full max-w-[70px] lg:max-w-[85px] w-auto object-contain" draggable={false} />
-          <img src={c.doitSrc} alt="" className="cl-logo h-full max-w-[70px] lg:max-w-[85px] w-auto object-contain" draggable={false} />
+        <div className="flex items-center gap-1.5 lg:gap-2 max-h-[34px] lg:max-h-[46px]">
+          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full max-w-[75px] lg:max-w-[90px] w-auto object-contain" draggable={false} />
+          <img src={c.doitSrc} alt="" className="cl-logo h-full max-w-[75px] lg:max-w-[90px] w-auto object-contain" draggable={false} />
         </div>
       ) : c.denoise ? (
         // korcham.png 원본 캔버스 네 변에 1px 불투명(alpha 251~255) 연회색(#cccccc) 테두리가
@@ -2449,13 +2458,39 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
   )
 }
 
-// Clients를 하나의 통합 고객사 섹션으로 표시한다(§완료보고 — 이전의 Institution/Brand 의미적
-// 2-section 구조는 폐기). CLIENTS 전체를 순서 그대로 반으로 나눠 시각적으로만 2개의 logo row를
-// 만든다 — 기관/브랜드 구분이 아니라 단순히 한 줄에 몰아넣지 않기 위한 배치.
+// reference의 .marquee-container 1개 = Institution 또는 Brand 한 그룹(제목 50px/700 + capsule
+// description + marquee + 하단 divider, index.css .clients-row-pill/.clients-marquee 참고).
+function ClientsRow({ title, desc, items, trackClass }: {
+  title: string
+  desc: string
+  items: ClientLogo[]
+  trackClass: 'clients-track-a' | 'clients-track-b'
+}) {
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-4 lg:gap-5">
+        <h3 className="text-black font-bold leading-none" style={{ fontSize: 'clamp(28px, 4vw, 50px)' }}>
+          {title}
+        </h3>
+        <span className="clients-row-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>{desc}</span>
+      </div>
+      <div className="clients-marquee mt-8 lg:mt-14 py-7 lg:py-9 border-b border-black">
+        <div className={`clients-track ${trackClass}`}>
+          {[...items, ...items].map((c, i) => (
+            <ClientLogoCell key={`${trackClass}-${c.name}-${i}`} c={c} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// reference(touchagraphic.com about-us .about-sec03)를 그대로 재현한다: 큰 display 제목
+// "OUR PARTNER."(실측 104px/600) + 작은 설명 capsule "TAG와 함께 하는 파트너사들"(실측
+// 18px/600, border 0.8px, height 42) title-bar, 그 아래 Institution/Brand 두 marquee-container
+// (§완료보고 — 이전의 "TAG와 함께한 고객들 입니다" 단일 capsule + CMYK motif + 무구분 2-row는
+// reference에 없는 임의 디자인이라 전부 제거).
 function Clients() {
-  const half = Math.ceil(CLIENTS.length / 2)
-  const rowA = CLIENTS.slice(0, half)
-  const rowB = CLIENTS.slice(half)
   return (
     <section id="clients" className="bg-white u-section scroll-mt-16 lg:scroll-mt-24">
       {/* .cl-logo(index.css)가 참조하는 alpha threshold filter — 화면에 그려지지 않는 정의 전용 SVG */}
@@ -2467,42 +2502,17 @@ function Clients() {
         </filter>
       </svg>
       <div className={SHELL}>
-        {/* 큰 heading이 아니라 reference의 editorial capsule label(index.css .clients-pill) —
-            이 영역 전체의 작지만 명확한 제목 역할(§완료보고). 좌우의 CMYK 모티프는 Header에서
-            이미 쓰는 브랜드 심볼(public/brand/touchagraphic-symbol.png)을 그대로 재사용 —
-            새로 그리지 않고 60~70% 크기로 축소만 한다. */}
-        <div className="flex items-center gap-3 lg:gap-4 flex-wrap">
-          <img
-            src="/brand/touchagraphic-symbol.png"
-            alt=""
-            aria-hidden="true"
-            className="h-[15px] w-[15px] lg:h-[20px] lg:w-[20px] shrink-0 object-contain"
-          />
-          <span className="clients-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-            TAG와 함께한 고객들 입니다
-          </span>
-          <img
-            src="/brand/touchagraphic-symbol.png"
-            alt=""
-            aria-hidden="true"
-            className="h-[15px] w-[15px] lg:h-[20px] lg:w-[20px] shrink-0 object-contain"
-          />
+        <div className="flex flex-wrap items-end gap-6 lg:gap-10">
+          <h2 className="text-black font-semibold leading-none" style={{ fontSize: 'clamp(40px, 9vw, 104px)' }}>
+            OUR PARTNER.
+          </h2>
+          <span className="partner-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>TAG와 함께 하는 파트너사들</span>
         </div>
-        {/* 두 row 사이에는 구분선 없이 넉넉한 여백만 둔다 — 하나의 통합 white field처럼 보이도록.
-            마지막 row 아래 divider만 페이지 리듬을 위해 유지한다. */}
-        <div className="clients-marquee mt-16 lg:mt-[70px] py-6 lg:py-[30px]">
-          <div className="clients-track clients-track-a">
-            {[...rowA, ...rowA].map((c, i) => (
-              <ClientLogoCell key={`a-${c.name}-${i}`} c={c} />
-            ))}
-          </div>
+        <div className="mt-8 lg:mt-10">
+          <ClientsRow title="Institution" desc="TAG와 함께한 기관들 입니다" items={INSTITUTION_CLIENTS} trackClass="clients-track-a" />
         </div>
-        <div className="clients-marquee mt-10 lg:mt-16 py-6 lg:py-[30px] border-b border-black">
-          <div className="clients-track clients-track-b">
-            {[...rowB, ...rowB].map((c, i) => (
-              <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />
-            ))}
-          </div>
+        <div className="mt-14 lg:mt-16">
+          <ClientsRow title="Brand" desc="TAG와 함께한 브랜드들 입니다" items={BRAND_CLIENTS} trackClass="clients-track-b" />
         </div>
       </div>
     </section>

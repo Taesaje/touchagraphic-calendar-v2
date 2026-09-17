@@ -130,10 +130,10 @@ body {
   filter: url(#cl-mono-alpha-cut) contrast(1.6);
 }
 
-/* Clients marquee — 하나의 통합 고객사 섹션 안에서 시각적으로만 분리된 두 개의 logo row(§완료보고,
-   Institution/Brand 의미적 구분은 폐기). 라이브러리 없이 순수 CSS transform만으로: 동일한 로고
-   세트를 두 번 이어붙인 트랙을 -50% 만큼 옮기면 이음매 없이 반복된다. JS rAF 없이 애니메이션
-   비용이 거의 0에 가깝다. 두 row 속도를 다르게(42s / 47s) 해 단조로움을 깬다. */
+/* Clients marquee — reference(touchagraphic.com about-us)의 Institution/Brand 두
+   .marquee-container(실제 Swiper 기반 무한 가로 autoplay)를 순수 CSS transform으로 재현한다.
+   동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼 옮기면 이음매 없이 반복된다. JS rAF 없이
+   애니메이션 비용이 거의 0에 가깝다. 두 row 속도를 다르게(42s / 47s) 해 단조로움을 깬다. */
 .clients-marquee {
   overflow: hidden;
 }
@@ -156,24 +156,41 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .clients-track { animation: none; }
 }
-/* Clients section label — reference(touchagraphic.com about-us)의 editorial capsule 느낌을
-   가져오되 버튼처럼 보이지 않도록 얇은 1px outline + white bg만 사용(§완료보고). */
-.clients-pill {
+/* reference .about-sec03 .tit-sec .round-text 실측(18px/600, border 0.8px, height 42,
+   padding 0 12px, color rgba(3,3,3,.7)) — "OUR PARTNER." 옆의 작은 설명 capsule. */
+.partner-pill {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border: 1px solid #111;
+  border: 0.8px solid #000;
   border-radius: 9999px;
   background: #fff;
-  color: #000;
-  height: 40px;
-  padding: 0 18px;
+  color: rgba(3, 3, 3, 0.7);
+  height: 36px;
+  padding: 0 12px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .partner-pill { height: 42px; font-size: 18px; }
+}
+/* reference .marquee-container .tit-sec01 .round-text 실측(20px/600, border 1px, height 44,
+   padding 0 16px) — Institution/Brand 각 row 제목 옆 설명 capsule. */
+.clients-row-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid #000;
+  border-radius: 9999px;
+  padding: 0 16px;
+  height: 38px;
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
 }
 @media (min-width: 1024px) {
-  .clients-pill { height: 44px; padding: 0 20px; font-size: 17px; }
+  .clients-row-pill { height: 44px; font-size: 20px; }
 }
 
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
