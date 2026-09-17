@@ -3849,7 +3849,11 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
       </section>
 
       {/* ── Portfolio grid ── desktop 3 / tablet 2 / mobile 1 열, 중앙 container 안(화면 양끝에 붙지 않음).
-          thumbnail 은 3:2(= 실제 이미지 공통 비율) wrapper + object-contain + black bg 로 절대 crop 되지 않는다. */}
+          thumbnail은 3:2 wrapper + object-cover(§완료보고 — black bleed fix). 이전엔 object-contain +
+          bg-black로 "절대 crop 안 됨"을 우선했지만, 실제 썸네일 원본 비율이 3:2와 달라 letterbox
+          띠가 생겼고, 검은 배경 사진에서는 안 보이다가 흰/베이지/회색 배경 사진에서만 wrapper의
+          검은 배경이 가장자리에 드러났다. grid 통일성이 더 중요하므로 object-cover로 프레임을
+          가득 채우고, wrapper bg는 흰 배경 이미지의 로딩 지연 중 대비가 자연스러운 white로 둔다. */}
       <section className="bg-white pt-8 lg:pt-10 pb-[100px] lg:pb-[150px]">
         <div className={PF_CONTAINER}>
           <div
@@ -3866,7 +3870,7 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
                   onClick={() => navigate(`/portfolio/${item.idx}`)}
                   className="group block w-full text-left"
                 >
-                  <div className="relative overflow-hidden rounded-[6px] bg-black" style={{ aspectRatio: '3 / 2' }}>
+                  <div className="relative overflow-hidden rounded-[6px] bg-white" style={{ aspectRatio: '3 / 2' }}>
                     <img
                       src={item.thumbnail.src}
                       alt={item.title}
@@ -3874,7 +3878,7 @@ function PortfolioPage({ navigate }: { navigate: (path: string, opts?: { scrollT
                       height={item.thumbnail.height}
                       loading="lazy"
                       decoding="async"
-                      className="absolute inset-0 w-full h-full object-contain object-center"
+                      className="absolute inset-0 block w-full h-full object-cover object-center"
                     />
                     {/* hover slide-up panel — 현재 Touchagraphic 구현 유지. desktop hover 에서만,
                         thumbnail 내부에서 아래→위로 부드럽게 등장하고 카드 밖으로 넘치지 않는다. */}
