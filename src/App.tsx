@@ -2318,15 +2318,6 @@ const CLIENTS: ClientLogo[] = [
   { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
   { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
-// Clients를 reference(touchagraphic.com about-us) 방식대로 Institution/Brand 두 그룹으로 분리한다
-// — 실제 기관/기업 성격 기준(6/6으로 억지로 맞추지 않음). 공공기관·공사·협회·문화기관 = Institution,
-// 민간 기업 = Brand.
-const INSTITUTION_NAMES = new Set([
-  '함평군 농업기술센터', '한국수목원정원관리원', '대한상공회의소',
-  '경기도중독관리통합지원센터', '한국가스기술공사', '한국환경산업기술원', '대구오페라하우스',
-])
-const INSTITUTION_CLIENTS = CLIENTS.filter(c => INSTITUTION_NAMES.has(c.name))
-const BRAND_CLIENTS = CLIENTS.filter(c => !INSTITUTION_NAMES.has(c.name))
 
 // ── CERTIFICATIONS ────────────────────────────────────────────────────────────
 // 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
@@ -2451,37 +2442,13 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
   )
 }
 
-// reference의 .marquee-container 1개 = Institution 또는 Brand 한 그룹. 제목(Latin, reference와
-// 동일하게 Instrument Sans 대신 프로젝트 기본 sans 사용 — 새 webfont 추가는 범위 밖) + capsule
-// description(.clients-pill, index.css) + marquee + 하단 divider 순서로 reference 구조를 그대로 따른다.
-function ClientsRow({ title, desc, items, trackClass }: {
-  title: string
-  desc: string
-  items: ClientLogo[]
-  trackClass: 'clients-track-a' | 'clients-track-b'
-}) {
-  return (
-    <div className={SHELL}>
-      <div className="flex flex-wrap items-center gap-4 lg:gap-5">
-        <h3 className="text-black font-bold leading-none" style={{ fontSize: 'clamp(30px, 4.5vw, 50px)' }}>
-          {title}
-        </h3>
-        <span className="clients-pill text-black text-[13px] lg:text-[18px]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-          {desc}
-        </span>
-      </div>
-      <div className="clients-marquee border-b border-black mt-9 lg:mt-14 py-7 lg:py-9">
-        <div className={`clients-track ${trackClass}`}>
-          {[...items, ...items].map((c, i) => (
-            <ClientLogoCell key={`${trackClass}-${c.name}-${i}`} c={c} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
+// Clients를 하나의 통합 고객사 섹션으로 표시한다(§완료보고 — 이전의 Institution/Brand 의미적
+// 2-section 구조는 폐기). CLIENTS 전체를 순서 그대로 반으로 나눠 시각적으로만 2개의 logo row를
+// 만든다 — 기관/브랜드 구분이 아니라 단순히 한 줄에 몰아넣지 않기 위한 배치.
 function Clients() {
+  const half = Math.ceil(CLIENTS.length / 2)
+  const rowA = CLIENTS.slice(0, half)
+  const rowB = CLIENTS.slice(half)
   return (
     <section id="clients" className="bg-white u-section scroll-mt-16 lg:scroll-mt-24">
       {/* .cl-logo(index.css)가 참조하는 alpha threshold filter — 화면에 그려지지 않는 정의 전용 SVG */}
@@ -2492,13 +2459,29 @@ function Clients() {
           </feComponentTransfer>
         </filter>
       </svg>
-      {/* reference(touchagraphic.com about-us)의 Institution/Brand 두 .marquee-container를 그대로
-          재현 — Clients 제목/서브카피 없이 Institution부터 바로 시작, 각 그룹은 자체 제목+pill+
-          marquee+divider를 가진다(§완료보고). Institution/Brand 사이 간격도 reference 실측(약 60px)에
-          맞춰 둔다. */}
-      <ClientsRow title="Institution" desc="TAG와 함께한 기관들 입니다" items={INSTITUTION_CLIENTS} trackClass="clients-track-a" />
-      <div className="mt-16 lg:mt-[60px]">
-        <ClientsRow title="Brand" desc="TAG와 함께한 브랜드들 입니다" items={BRAND_CLIENTS} trackClass="clients-track-b" />
+      <div className={SHELL}>
+        <h2
+          className="text-black font-bold leading-[1.15]"
+          style={{ fontSize: 'clamp(30px, 3vw, 44px)', fontFamily: 'Noto Sans KR, sans-serif' }}
+        >
+          TAG와 함께한 고객들 입니다
+        </h2>
+        {/* 두 row 사이에는 구분선 없이 여백만 둔다 — 하나의 통합 white field처럼 보이도록.
+            마지막 row 아래 divider만 페이지 리듬을 위해 유지한다. */}
+        <div className="clients-marquee mt-9 lg:mt-12">
+          <div className="clients-track clients-track-a">
+            {[...rowA, ...rowA].map((c, i) => (
+              <ClientLogoCell key={`a-${c.name}-${i}`} c={c} />
+            ))}
+          </div>
+        </div>
+        <div className="clients-marquee mt-10 lg:mt-12 border-b border-black pb-7 lg:pb-9">
+          <div className="clients-track clients-track-b">
+            {[...rowB, ...rowB].map((c, i) => (
+              <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   )
