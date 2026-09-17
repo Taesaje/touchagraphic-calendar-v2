@@ -157,6 +157,27 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .clients-track { animation: none; }
 }
+/* Institution/Brand 옆 supporting copy — reference의 outline capsule을 다시 쓰되, Institution/
+   Brand가 secondary hierarchy인 만큼 reference 실측(44px/20px)보다 절제된 크기로 낮춘다.
+   plain text(§완료보고: 이전엔 black/50이라 너무 흐릿했음)보다 확실히 읽히도록 색도 올린다. */
+.clients-row-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid rgba(0, 0, 0, 0.82);
+  border-radius: 9999px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.78);
+  height: 34px;
+  padding: 0 14px;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .clients-row-pill { height: 38px; padding: 0 16px; font-size: 15px; font-weight: 600; }
+}
 
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
 .pf-feed-item {

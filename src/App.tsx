@@ -2472,13 +2472,11 @@ function ClientsRow({ title, desc, items, trackClass }: {
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-baseline gap-3 lg:gap-4">
+      <div className="flex flex-wrap items-center gap-4 lg:gap-[18px]">
         <h3 className="text-black font-bold leading-none" style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}>
           {title}
         </h3>
-        <span className="text-black/50 text-[13px] lg:text-[15px]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-          {desc}
-        </span>
+        <span className="clients-row-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>{desc}</span>
       </div>
       <div className="clients-marquee mt-10 lg:mt-[52px] py-7 lg:py-9 border-b border-black/20">
         <div className={`clients-track ${trackClass}`}>
