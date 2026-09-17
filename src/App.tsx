@@ -839,11 +839,12 @@ function Hero() {
   return (
     <section id="hero" className="bg-white">
       <div className={SHELL}>
-        {/* 상단 pt = 고정 헤더 높이(64/96px) + Header→Hero 여백. §Header/Hero/Cursor refinement —
-            header 밑 divider를 없애면서 header와 Hero가 하나의 canvas로 이어지되, 곧바로 붙어
-            보이지 않도록 여백을 75~110px 범위(desktop)로 넓힘(기존 56px → 90px). mobile은 비례해
-            32px → 48px. 하단 pb는 이번 작업 범위 밖이라 그대로 유지. */}
-        <div className="pt-[112px] lg:pt-[186px] pb-[36px] lg:pb-[56px]">
+        {/* 상단 pt = 고정 헤더 높이(64/96px) + Header→Hero 여백. §Header/Hero vertical rhythm
+            2차 재조정 — 68px(desktop)도 여전히 "header 끝 → 빈 공간 → Hero 시작"으로 보인다는
+            피드백. header/logo/nav/pill/headline이 하나의 vertical rhythm으로 읽히도록 한 번 더
+            줄인다(desktop 68→52px, mobile 36→30px). 48px 밑으로 더 줄이면 답답해지므로 여기서
+            멈춘다. 하단 pb는 이번 작업 범위 밖이라 그대로 유지. */}
+        <div className="pt-[94px] lg:pt-[148px] pb-[36px] lg:pb-[56px]">
           {/* 2026-09-07 refinement — wide desktop(1600px+)에서 좌측 headline과 우측 supporting
               copy 사이 gutter가 실측 1000px+ 로 벌어져 두 블록이 "떠 있는" 것처럼 보이던 문제를
               u-content-max(1600px 캡)로 해결. 좌측 시작선(.u-shell)은 그대로 유지. */}
@@ -2613,7 +2614,12 @@ function CertificationSection() {
             TIME SEQUENCE로 분리한다(§완료보고 2차). STEP1 section heading(0) → STEP2 주요 인증
             heading(300)+항목(410~) → STEP3 직접생산 heading(650, 두 그룹을 동시에 깨우지 않도록
             충분히 늦춤)+항목(760~). */}
-        <div className="mt-8 lg:mt-12 grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-10" style={fontKr}>
+        {/* 좌/우 그룹 사이 vertical divider(border-l/border-t) 제거 — "두 개의 박스"가 아니라
+            "한 섹션 안의 두 묶음"으로 읽히도록 선 없이 gap만으로 구분한다. 선이 있을 때는 gap-10
+            + pl-10(desktop) / gap-8 + pt-6(mobile)로 선 자리를 확보했지만, 선을 없앤 지금은 그
+            공간을 그대로 남기면 가운데가 휑해 보이므로 gap 자체를 살짝 넓혀(desktop 40→64px,
+            mobile 32→40px) 여백만으로 구분되는 느낌을 만든다. */}
+        <div className="mt-8 lg:mt-12 grid gap-10 lg:grid-cols-[2fr_3fr] lg:gap-16" style={fontKr}>
           <div className="min-w-0">
             <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5" data-reveal="up" data-reveal-delay="300">주요 인증 및 자격</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
@@ -2632,7 +2638,7 @@ function CertificationSection() {
               ))}
             </div>
           </div>
-          <div className="min-w-0 border-t border-black/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
+          <div className="min-w-0">
             <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5" data-reveal="up" data-reveal-delay="650">직접생산확인증명서</h3>
             <div className="grid grid-cols-3 gap-3 lg:gap-5">
               {PRODUCTION_CERTIFICATIONS.map((c, i) => (
