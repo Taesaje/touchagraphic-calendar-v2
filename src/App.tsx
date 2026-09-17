@@ -120,40 +120,29 @@ function useScrollReveal(resetKey: unknown) {
     // chapter — Clients marquee row 전용. Institution row가 화면을 벗어나기 전에 Brand row가
     // 미리 활성화되지 않도록 rootMargin 여유 없이 실제로 뚜렷이 들어와야 시작한다.
     const chapterIO = makeObserver({ threshold: 0.35, rootMargin: '0px' })
-    // early — Portfolio 전용(§완료보고 3차). Hero 바로 다음 chapter라 standard(-24%)만큼 깊게
-    // 기다리면 "제작 사례"가 필요 이상 늦게 뜬다는 피드백으로 추가. 다른 section의 standard
-    // 동작은 그대로 두고, data-reveal-zone="early"가 붙은 대상만 더 얕은 지점에서 시작한다.
-    const earlyIO = makeObserver({ threshold: 0.1, rootMargin: '0px 0px -12% 0px' })
     allTargets.forEach(el => {
       if (el.dataset.reveal === 'marquee') chapterIO.observe(el)
-      else if (el.dataset.revealZone === 'early') earlyIO.observe(el)
       else standardIO.observe(el)
     })
-    return () => { standardIO.disconnect(); chapterIO.disconnect(); earlyIO.disconnect() }
+    return () => { standardIO.disconnect(); chapterIO.disconnect() }
   }, [resetKey])
 }
 // 큰 typography만 쓰는 줄 단위 clip reveal(Hero/Portfolio/OUR PARTNER. 전용 — index.css의
 // .reveal-clip-line/.reveal-clip-inner 참고). 일반 본문은 data-reveal="up"을 쓰고 이 컴포넌트는
 // "인쇄물이 정렬되며 등장하는" 감각이 필요한 소수의 대형 헤드라인에만 쓴다. line stagger는
 // 160~200ms 범위(§완료보고 2차 — 1차의 110ms는 두 줄이 거의 붙어 나와 옅었다).
-function RevealLines({ lines, as = 'span', delayStep = 180, baseDelay = 0, lineClassName, zone }: {
+function RevealLines({ lines, as = 'span', delayStep = 180, baseDelay = 0, lineClassName }: {
   lines: string[]
   as?: 'span' | 'div'
   delayStep?: number
   baseDelay?: number
   lineClassName?: string
-  zone?: 'early'
 }) {
   const Tag = as
   return (
     <>
       {lines.map((line, i) => (
-        <Tag
-          key={i}
-          className={`reveal-clip-line${lineClassName ? ` ${lineClassName}` : ''}`}
-          data-reveal-delay={baseDelay + i * delayStep}
-          data-reveal-zone={zone}
-        >
+        <Tag key={i} className={`reveal-clip-line${lineClassName ? ` ${lineClassName}` : ''}`} data-reveal-delay={baseDelay + i * delayStep}>
           <span className="reveal-clip-inner">{line}</span>
         </Tag>
       ))}
@@ -1155,21 +1144,18 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. Portfolio는 Hero
-                바로 다음 chapter라 다른 section의 standard trigger(-24%)보다 얕은 전용 "early"
-                zone(rootMargin -12%, threshold 0.1)을 쓴다(§완료보고 3차 — "제작 사례"가 필요
-                이상 늦게 뜬다는 피드백으로 Portfolio에만 적용, global/다른 section은 미변경).
-                PHASE 1 heading(0) → PHASE 2 caption/컨트롤(150) → PHASE 3 rail(320) →
-                PHASE 4 첫 카드(440+, stagger 95). */}
+            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. PHASE 1 heading(0) →
+                PHASE 2 caption/컨트롤(250) → PHASE 3 rail(520) → PHASE 4 첫 카드(680+, §완료보고
+                2차 — 같은 화면 안 hierarchy를 명확한 time sequence로 분리). */}
             <h2
               className="text-black"
               style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
             >
-              <RevealLines lines={['제작 사례']} zone="early" />
+              <RevealLines lines={['제작 사례']} />
             </h2>
-            <span className="t-caption text-black/45" data-reveal="up" data-reveal-zone="early" data-reveal-delay="150">Portfolio</span>
+            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="250">Portfolio</span>
           </div>
-          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-zone="early" data-reveal-delay="150">
+          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="250">
             {/* prev/next — 데스크톱 전용, hairline circle. 모바일은 스와이프에 위임 */}
             <div className="hidden lg:flex items-center gap-2">
               <button
@@ -1224,8 +1210,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
         }}
         className="mt-1 lg:mt-[20px] [&::-webkit-scrollbar]:hidden"
         data-reveal="up"
-        data-reveal-zone="early"
-        data-reveal-delay="320"
+        data-reveal-delay="520"
       >
         <div
           ref={trackRef}
@@ -1236,11 +1221,11 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
               복제 세트(clone)는 스크린리더 중복 방지를 위해 aria-hidden 처리. */}
           {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => {
             const isClone = i >= PORTFOLIO.length
-            // PHASE 4 — rail(320ms) 다음 처음 보이는 실카드 4개만 95ms 간격 stagger(§완료보고
-            // 3차 — early zone과 함께 전체 sequence를 압축). clone·나머지 카드는 이미 in-view
-            // 상태로 렌더돼 자동 슬라이드 로직(offsetLeft 실측)에 영향 없이 그대로 보인다.
+            // PHASE 4 — rail(520ms) 다음 처음 보이는 실카드 4개만 120ms 간격 stagger(§완료보고
+            // 2차). clone·나머지 카드는 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft
+            // 실측)에 영향 없이 그대로 보인다.
             const revealProps = !isClone && i < 4
-              ? { 'data-reveal': 'up', 'data-reveal-zone': 'early', 'data-reveal-delay': String(440 + staggerMs(i, 95, 340)) }
+              ? { 'data-reveal': 'up', 'data-reveal-delay': String(680 + staggerMs(i, 120, 400)) }
               : {}
             return (
             <button
