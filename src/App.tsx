@@ -121,6 +121,12 @@ function useScrollReveal(resetKey: unknown) {
     // 미리 활성화되지 않도록 rootMargin 여유 없이 실제로 뚜렷이 들어와야 시작한다.
     const chapterIO = makeObserver({ threshold: 0.35, rootMargin: '0px' })
     allTargets.forEach(el => {
+      // Portfolio가 초기 viewport 근처라 useInitialPortfolioSequence()가 이미 자동 재생을
+      // 맡은 경우 data-portfolio-auto="1"이 붙는다 — 이 요소는 scroll observer에 등록하지
+      // 않는다(§완료보고 5차 — auto 경로와 scroll 경로가 동시에 같은 요소를 activate하는
+      // race를 막기 위함). 이 마킹은 Portfolio의 useLayoutEffect에서 이 effect보다 먼저
+      // 끝난다(React가 child effect를 parent effect보다 먼저 실행).
+      if (el.dataset.portfolioAuto === '1') return
       if (el.dataset.reveal === 'marquee') chapterIO.observe(el)
       else standardIO.observe(el)
     })
@@ -131,23 +137,79 @@ function useScrollReveal(resetKey: unknown) {
 // .reveal-clip-line/.reveal-clip-inner 참고). 일반 본문은 data-reveal="up"을 쓰고 이 컴포넌트는
 // "인쇄물이 정렬되며 등장하는" 감각이 필요한 소수의 대형 헤드라인에만 쓴다. line stagger는
 // 160~200ms 범위(§완료보고 2차 — 1차의 110ms는 두 줄이 거의 붙어 나와 옅었다).
-function RevealLines({ lines, as = 'span', delayStep = 180, baseDelay = 0, lineClassName }: {
+function RevealLines({ lines, as = 'span', delayStep = 180, baseDelay = 0, lineClassName, group }: {
   lines: string[]
   as?: 'span' | 'div'
   delayStep?: number
   baseDelay?: number
   lineClassName?: string
+  group?: string
 }) {
   const Tag = as
   return (
     <>
       {lines.map((line, i) => (
-        <Tag key={i} className={`reveal-clip-line${lineClassName ? ` ${lineClassName}` : ''}`} data-reveal-delay={baseDelay + i * delayStep}>
+        <Tag
+          key={i}
+          className={`reveal-clip-line${lineClassName ? ` ${lineClassName}` : ''}`}
+          data-reveal-delay={baseDelay + i * delayStep}
+          data-reveal-group={group}
+        >
           <span className="reveal-clip-inner">{line}</span>
         </Tag>
       ))}
     </>
   )
+}
+
+// Portfolio 전용 — Hero → Portfolio "opening cinematic sequence" 연결(§완료보고 5차). Portfolio가
+// 페이지 최초 viewport 근처(= Hero 바로 아래로 자연스럽게 이어지는 desktop 첫 화면)에 있으면
+// 사용자가 scroll하지 않아도 Hero timeline이 끝나갈 무렵 자동으로 이어서 시작한다. Portfolio가
+// 초기 화면 밖에 멀리 있으면(작은 viewport/모바일) 아무것도 하지 않고 기존 useScrollReveal의
+// standardIO(scroll 진입 시 시작)에 그대로 맡긴다 — AUTO 또는 SCROLL 중 하나만 실행된다.
+function useInitialPortfolioSequence() {
+  useLayoutEffect(() => {
+    const target = document.getElementById('portfolio-scroll-target')
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal-group="portfolio"]'))
+    if (!target || els.length === 0) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      // reduced-motion은 useScrollReveal이 어차피 즉시 전부 표시하므로 auto 대상에서 제외해
+      // 이중 처리 없이 그 경로 하나로만 처리되게 한다.
+      return
+    }
+    // getBoundingClientRect는 호출 시점에 동기적으로 layout을 확정시키므로(강제 reflow),
+    // useLayoutEffect(페인트 전, DOM 커밋 직후) 안에서 바로 읽어도 안정적이다 — 여기서
+    // rAF로 한 프레임 더 미루면 useScrollReveal(부모 effect)이 먼저 실행돼 버려 race가
+    // 생긴다(§완료보고 — child effect가 parent effect보다 먼저 실행되는 React 순서를
+    // 이용해 "먼저 마킹 → 그 다음 관찰"을 동기적으로 보장한다).
+    const rect = target.getBoundingClientRect()
+    const nearInitialViewport = rect.top < window.innerHeight * 1.15
+    if (!nearInitialViewport) return // 화면 밖 멀리 있으면 scroll 경로(standardIO)에 맡긴다
+    const AUTO_BASE = 1150 // Hero 마지막 motion(hairline 880ms)이 거의 끝나갈 때 이어받는다
+    const timers: number[] = []
+    els.forEach(el => {
+      el.dataset.portfolioAuto = '1' // useScrollReveal이 이 요소를 관찰하지 않도록 마킹
+      const rel = Number(el.dataset.revealDelay || 0)
+      const id = window.setTimeout(() => { el.classList.add('is-inview') }, AUTO_BASE + rel)
+      timers.push(id)
+    })
+    // fast scroll — Hero를 읽는 동안의 미세한 scroll에는 반응하지 않고, 사용자가 실제로
+    // Portfolio 쪽으로 내려와 heading이 화면 절반 위로 올라왔을 때만 남은 항목을 즉시
+    // settle시킨다(§완료보고 5차 — 기존 reveal system의 fast-scroll 원칙을 가벼운 형태로
+    // 재사용, 매 scroll마다 무거운 계산 없이 rect.top 비교 하나뿐).
+    function onScroll() {
+      if (!target || target.getBoundingClientRect().top >= window.innerHeight * 0.5) return
+      timers.forEach(id => window.clearTimeout(id))
+      els.forEach(el => el.classList.add('is-inview'))
+      window.removeEventListener('scroll', onScroll)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      timers.forEach(id => window.clearTimeout(id))
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
 }
 
 // ── 공통 장식 ────────────────────────────────────────────────────────────────
@@ -882,6 +944,10 @@ const PORTFOLIO: PortfolioItem[] = [
 const RAIL_PAD = 'u-rail-pad'
 
 function Portfolio({ navigate }: { navigate: (path: string) => void }) {
+  // Hero → Portfolio opening sequence(§완료보고 5차) — Portfolio가 초기 viewport 근처면
+  // scroll 없이도 Hero timeline 뒤에 자동으로 이어서 시작한다. 멀리 있으면(작은 viewport)
+  // 아무것도 하지 않고 기존 scroll 진입(useScrollReveal의 standardIO)에 맡긴다.
+  useInitialPortfolioSequence()
   const viewportRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   // 가격 계산과 무관한 UI 전용 ref — 마우스 드래그 상태 (라이브러리 없이 native scrollLeft)
@@ -1144,20 +1210,22 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. trigger(standardIO,
-                -24%)는 Hero와 동일하게 유지 — Portfolio가 더 일찍 시작하지는 않는다. PHASE 1
-                heading(0) → PHASE 2 caption/컨트롤(200) → PHASE 3 rail(430) → PHASE 4 첫 카드
-                (570+, §완료보고 4차 — 2차(250/520/680) 대비 내부 전개만 약 15~20% 압축,
-                trigger 시점은 불변). */}
+            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. relative timing은
+                PHASE 1 heading(0) → PHASE 2 caption/컨트롤(200) → PHASE 3 rail(430) → PHASE 4
+                첫 카드(570+, §완료보고 4차). data-reveal-group="portfolio"는 useInitialPortfolioSequence
+                (§완료보고 5차)가 Hero 직후 자동 재생 대상을 찾는 marker — Portfolio가 초기 화면
+                근처면 이 relative 값 그대로 AUTO_BASE(1150ms)에 더해 자동 실행되고, 멀리 있으면
+                기존 scroll trigger(standardIO, -24%)로 똑같이 이 값을 쓴다. 두 경로 모두 같은
+                상대 timing을 공유한다. */}
             <h2
               className="text-black"
               style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
             >
-              <RevealLines lines={['제작 사례']} />
+              <RevealLines lines={['제작 사례']} group="portfolio" />
             </h2>
-            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="200">Portfolio</span>
+            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="200" data-reveal-group="portfolio">Portfolio</span>
           </div>
-          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="200">
+          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="200" data-reveal-group="portfolio">
             {/* prev/next — 데스크톱 전용, hairline circle. 모바일은 스와이프에 위임 */}
             <div className="hidden lg:flex items-center gap-2">
               <button
@@ -1213,6 +1281,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
         className="mt-1 lg:mt-[20px] [&::-webkit-scrollbar]:hidden"
         data-reveal="up"
         data-reveal-delay="430"
+        data-reveal-group="portfolio"
       >
         <div
           ref={trackRef}
@@ -1227,7 +1296,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
             // 4차 — 2차(680+120) 대비 내부 전개만 압축, trigger는 그대로). clone·나머지 카드는
             // 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft 실측)에 영향 없이 그대로 보인다.
             const revealProps = !isClone && i < 4
-              ? { 'data-reveal': 'up', 'data-reveal-delay': String(570 + staggerMs(i, 105, 330)) }
+              ? { 'data-reveal': 'up', 'data-reveal-delay': String(570 + staggerMs(i, 105, 330)), 'data-reveal-group': 'portfolio' }
               : {}
             return (
             <button
