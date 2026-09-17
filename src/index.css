@@ -109,11 +109,13 @@ body {
 
 /* Clients — 로고는 원본 브랜드 컬러 그대로 표시한다(§완료보고: 이전에는 brightness(0)/grayscale(1)로
    전부 단색 실루엣 처리해 원색이 죽어 있었음 — 제거). */
-/* 일부 로고 원본 PNG에 아주 옅은(반투명) 디자인 캔버스 그리드가 실수로 같이 export 돼 있다.
-   alpha 0.5 미만을 완전히 지우는 SVG filter(#cl-mono-alpha-cut, 아래 Clients 컴포넌트에 정의)만
-   통과시켜 그 반투명 노이즈만 제거한다 — 색상에는 영향 없음. 원본 파일은 무변경. */
+/* asset audit 결과(§완료보고) — 12개 로고 중 캔버스 노이즈/테두리 아티팩트가 실제로 있는 건
+   대한상공회의소(.cl-logo-denoise)와 대구오페라하우스·이글루코퍼레이션(.cl-logo-blend)뿐이었다.
+   나머지 로고는 canvas 픽셀을 직접 샘플링해 투명 배경이 깨끗함을 확인했으므로 alpha-cut SVG
+   filter를 적용하지 않는다 — SVG filter는 GPU 합성이 어려워 continuous marquee 중 매 프레임
+   래스터화가 필요해질 수 있고, 불필요하게 정상 anti-aliasing까지 깎아낼 위험도 있다("good source
+   asset → no runtime filter"). .cl-logo는 이제 순수 마킹용 클래스로만 남긴다. */
 .cl-logo {
-  filter: url(#cl-mono-alpha-cut);
 }
 /* 일부 로고 파일은 투명 배경이 아니라 불투명 흰 배경 사각형이 내장돼 있어(원본 파일이라 수정 불가),
    그대로 두면 section의 흰 배경과 이질감 없이 섞여야 하는데 사각형 경계가 도드라진다. 이 경우는
@@ -137,6 +139,10 @@ body {
    (52s / 58s, 차이 6s) 흘려 "여유 있게 지나가는" 인상을 준다(§완료보고 — 42s/47s에서 조정).*/
 .clients-marquee {
   overflow: hidden;
+  /* 반쪽만 보이는 로고가 "깨진 이미지"처럼 도드라지지 않도록 아주 짧은(28px) edge fade만
+     사용한다 — 전체 폭 대비 6~10%를 덮는 강한 gradient/mask는 아니다(§완료보고). */
+  -webkit-mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 28px), transparent);
 }
 .clients-track {
   display: flex;
@@ -144,12 +150,15 @@ body {
   animation-name: clients-marquee;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  /* track만 움직이고 개별 로고는 움직이지 않는다 — will-change로 별도 compositor layer를
+     미리 잡아 continuous 이동 중 매 프레임 재래스터화를 줄인다(§완료보고). */
+  will-change: transform;
 }
 .clients-track-a { animation-duration: 52s; }
 .clients-track-b { animation-duration: 58s; }
 @keyframes clients-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
 }
 @media (hover: hover) and (pointer: fine) {
   .clients-marquee:hover .clients-track { animation-play-state: paused; }

@@ -2286,13 +2286,15 @@ function Service() {
 // 실제 공식 로고 asset, 원본 브랜드 컬러 그대로 표시(§완료보고 — 과거 brightness(0)/grayscale(1)로
 // 전부 단색 처리하던 것 제거). .cl-logo(index.css)는 이제 반투명 노이즈 제거용 alpha-cut filter만
 // 적용하고, .cl-logo-blend는 로고에 내장된 불투명 흰 배경만 지우는 mix-blend-mode만 적용한다.
-// scale: 로고마다 원본 캔버스 여백이 달라 동일 height로 맞춰도 체감 크기가 다르기 때문에 두는
-// 표시 전용 보정값(기본 1). 실제 내용이 캔버스 대부분을 차지하는 로고는 1, 캔버스에 여백이 큰
-// 로고(대한상공회의소·이글루코퍼레이션)만 확대해 시각 밀도를 맞춘다.
+// sizeBoost: 로고마다 원본 캔버스 여백이 달라 동일 box에 맞춰도 체감 크기(optical weight)가
+// 다르기 때문에 두는 표시 전용 보정값(기본 1, 0.85~1.15 권장). CSS transform:scale이 아니라
+// ClientLogoCell에서 실제 max-height/max-width(레이아웃 치수)에 곱해 적용한다 — continuous
+// marquee 중 track의 transform과 개별 img의 transform이 겹치면 rasterization이 불안정해질 수
+// 있어(§완료보고) transform 기반 보정을 없앴다.
 type ClientLogo = {
   name: string
   src?: string
-  scale?: number
+  sizeBoost?: number
   // 이글루코퍼레이션 전용 — 원본 SVG에 불투명 흰 배경 사각형이 내장돼 있어 brightness(0) 대신
   // blend-mode 로 흰 배경만 지운다(위 .cl-logo-blend 참고)
   blend?: boolean
@@ -2305,18 +2307,18 @@ type ClientLogo = {
 }
 const CLIENTS: ClientLogo[] = [
   // 1행 = 기관, 2행 = 기업, 3행 = 나머지(순서 요청대로)
-  { name: '함평군 농업기술센터',       src: clHampyeong,    scale: 1 },
-  { name: '한국수목원정원관리원',       src: clKoagi,        scale: 1.15 },
-  { name: '대한상공회의소',           src: clKorcham,      scale: 1.15, denoise: true },
-  { name: '경기도중독관리통합지원센터', src: clGcamc,        scale: 1 },
+  { name: '함평군 농업기술센터',       src: clHampyeong },
+  { name: '한국수목원정원관리원',       src: clKoagi,        sizeBoost: 1.15 },
+  { name: '대한상공회의소',           src: clKorcham,      sizeBoost: 1.15, denoise: true },
+  { name: '경기도중독관리통합지원센터', src: clGcamc },
   { name: '아이디어두잇',             ideaSrc: clIdeadoitIdea, doitSrc: clIdeadoitDoit },
-  { name: '설빙',                   src: clSulbing,      scale: 1 },
-  { name: '동아제약',                src: clDongaPharm,   scale: 1 },
-  { name: '이글루코퍼레이션',          src: clIgloo,        scale: 1.15, blend: true },
-  { name: '한국가스기술공사',          src: clKogasTech,    scale: 1 },
-  { name: '한국환경산업기술원',        src: clKeiti,        scale: 1 },
-  { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
-  { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
+  { name: '설빙',                   src: clSulbing },
+  { name: '동아제약',                src: clDongaPharm },
+  { name: '이글루코퍼레이션',          src: clIgloo,        sizeBoost: 1.15, blend: true },
+  { name: '한국가스기술공사',          src: clKogasTech },
+  { name: '한국환경산업기술원',        src: clKeiti },
+  { name: '세종스포츠정형외과',        src: clSejongSports },
+  { name: '대구오페라하우스',          src: clDaeguOpera,   blend: true },
 ]
 // reference(touchagraphic.com about-us .about-sec03)는 OUR PARTNER. 아래에 Institution/Brand
 // 두 개의 독립된 .marquee-container를 갖는다 — 실제 기관/기업 성격 기준으로 분리(§완료보고).
@@ -2408,43 +2410,47 @@ function CertificationSection() {
   )
 }
 
-// 로고 한 칸 — box/card 없이 넓은 가로 field 위에 로고 자체가 놓이는 느낌을 위해 배경/테두리
-// 없이 높이 기준으로만 정렬한다(reference touchagraphic.com about 페이지의 .item-marquee와 동일
-// 원리 — 다만 reference는 250×90 고정 box + object-fit:cover지만, 우리 로고 asset은 reference처럼
-// 캔버스에 맞춰 미리 크롭돼 있지 않아 cover를 쓰면 로고가 잘린다. 원본을 임의로 재가공하지 않기
-// 위해 object-contain + height 기준 정렬을 유지한다). 로고별 캔버스 여백 차이는 CLIENTS의 scale
-// 값으로만 보정한다.
 // 고정 logo slot — reference(.item-marquee, 250×90 box + object-fit:cover)와 같은 원리로
 // 모든 로고를 같은 크기의 보이지 않는 프레임 안에 놓고 object-contain으로 담아 "같은 px 높이"가
-// 아니라 "같은 optical 무게"로 보이게 한다. 우리 asset은 reference처럼 캔버스에 맞춰 미리
-// 크롭돼 있지 않아 cover 대신 contain을 쓴다. slot 폭이 로고 간 가로 gap을 겸하며, "많이
-// 보여준다"보다 "여유 있게 지나간다"는 인상을 위해 desktop 1920 기준 한 화면에 5~7개 정도만
-// 보이도록 slot을 reference보다 넓게 잡는다(§완료보고).
-const CLIENT_SLOT = 'w-[210px] lg:w-[260px] h-[56px] lg:h-[74px] flex items-center justify-center shrink-0'
-const CLIENT_LOGO_SIZE = 'max-h-[32px] lg:max-h-[44px] max-w-[180px] lg:max-w-[220px]'
+// 아니라 "같은 optical 무게"로 보이게 한다. slot 폭 자체가 로고 간 중심 간격을 담당하므로 별도
+// gap/padding을 쓰지 않는다(§완료보고). desktop 1920 기준 한 화면에 5~7개 정도만 보이도록
+// reference(250px)보다 넓게 잡는다.
+const CLIENT_SLOT = 'w-[220px] lg:w-[260px] h-[56px] lg:h-[74px] flex items-center justify-center shrink-0'
+// 로고 공통 bounding box(실제 max-height/max-width) — sizeBoost는 이 실제 치수에 곱해서
+// 적용한다(0.85~1.15). CSS transform:scale은 crop 목적(대한상공회의소 1px 테두리 제거)에만
+// 남겨두고, optical 크기 보정에는 쓰지 않는다 — continuous marquee 중 track transform과 개별
+// img transform이 겹치면 rasterization이 불안정해질 수 있기 때문이다(§완료보고).
+const CLIENT_LOGO_BASE = { hBase: 28, hLg: 38, wBase: 150, wLg: 190 }
+function logoBoxStyle(boost: number) {
+  return {
+    maxHeight: `${Math.round(CLIENT_LOGO_BASE.hLg * boost)}px`,
+    maxWidth: `${Math.round(CLIENT_LOGO_BASE.wLg * boost)}px`,
+  }
+}
 function ClientLogoCell({ c }: { c: ClientLogo }) {
-  const scale = c.scale ?? 1
+  const boost = c.sizeBoost ?? 1
   return (
     <div className={CLIENT_SLOT}>
       {c.ideaSrc && c.doitSrc ? (
-        // IDEA/DO IT 두 asset 조합 전체가 다른 로고 하나와 같은 slot 안에 들어가야 하므로,
-        // 개별 이미지 max-width를 slot 폭의 절반 수준으로 나눠 캡한다(§완료보고).
-        <div className="flex items-center gap-1.5 lg:gap-2 max-h-[32px] lg:max-h-[44px]">
-          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full max-w-[75px] lg:max-w-[90px] w-auto object-contain" draggable={false} />
-          <img src={c.doitSrc} alt="" className="cl-logo h-full max-w-[75px] lg:max-w-[90px] w-auto object-contain" draggable={false} />
+        // IDEA/DO IT 두 asset 조합 전체가 다른 로고 하나와 같은 slot을 점유해야 하므로, 조합
+        // 전체 높이를 로고 1개 기준 box로 제한하고 개별 이미지 폭을 절반씩 나눠 캡한다(§완료보고).
+        <div className="flex items-center gap-1.5 lg:gap-2" style={{ maxHeight: `${CLIENT_LOGO_BASE.hLg}px` }}>
+          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full max-w-[65px] lg:max-w-[78px] w-auto object-contain" draggable={false} />
+          <img src={c.doitSrc} alt="" className="cl-logo h-full max-w-[65px] lg:max-w-[78px] w-auto object-contain" draggable={false} />
         </div>
       ) : c.denoise ? (
         // korcham.png 원본 캔버스 네 변에 1px 불투명(alpha 251~255) 연회색(#cccccc) 테두리가
         // export 시 실수로 같이 포함돼 있어 alpha-cut(반투명 기준)으로 안 지워진다. 재제작 대신
         // overflow-hidden 창 안에서 원본을 살짝(4%) 더 확대해 그 1px 테두리만 밖으로 밀어낸다 —
-        // 로고 내용 자체는 원본 그대로.
-        <div className={`overflow-hidden flex items-center justify-center ${CLIENT_LOGO_SIZE}`}>
+        // 이 4%는 순수 crop 목적의 고정값이라 sizeBoost와 분리해 img에만 적용하고, optical
+        // 크기 보정(sizeBoost)은 wrapper의 실제 box 치수로 처리한다.
+        <div className="overflow-hidden flex items-center justify-center" style={logoBoxStyle(boost)}>
           <img
             src={c.src}
             alt={c.name}
             draggable={false}
             className="cl-logo-denoise max-h-full w-auto object-contain"
-            style={{ transform: `scale(${scale * 1.04})` }}
+            style={{ transform: 'scale(1.04)' }}
           />
         </div>
       ) : (
@@ -2452,18 +2458,18 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
           src={c.src}
           alt={c.name}
           draggable={false}
-          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} ${CLIENT_LOGO_SIZE} w-auto object-contain`}
-          style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
+          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} w-auto object-contain`}
+          style={logoBoxStyle(boost)}
         />
       )}
     </div>
   )
 }
 
-// reference의 .marquee-container 1개 = Institution 또는 Brand 한 그룹. reference는 제목 옆에
-// pill을 쓰지만 V2 안에서는 pill/border 없는 plain supporting copy로 낮춰 category label처럼
-// 보이게 한다(§완료보고 — OUR PARTNER.가 유일한 main title, Institution/Brand는 그 아래 secondary
-// hierarchy). divider도 solid black 대신 옅은 black/20으로 무게를 낮춘다.
+// reference의 .marquee-container 1개 = Institution 또는 Brand 한 그룹. 제목 옆 설명은
+// reference처럼 outline capsule(.clients-row-pill, index.css)로 표시하되 reference 실측
+// (44px/20px)보다 절제된 크기로 낮춰 OUR PARTNER.(유일한 main title) 아래 secondary
+// hierarchy임을 분명히 한다. divider도 solid black 대신 옅은 black/20으로 무게를 낮춘다.
 function ClientsRow({ title, desc, items, trackClass }: {
   title: string
   desc: string
