@@ -2299,12 +2299,15 @@ type ClientLogo = {
   // 아이디어두잇 전용 — 공식 사이트가 idea/doit 두 asset으로 나눠 쓰는 로고를 한 셀에서 조합
   ideaSrc?: string
   doitSrc?: string
+  // 대한상공회의소 전용 — 원본 PNG에 옅은 캔버스 노이즈가 사각형 테두리처럼 보여 alpha-cut만으로
+  // 안 지워짐(§완료보고) — contrast 추가(.cl-logo-denoise)
+  denoise?: boolean
 }
 const CLIENTS: ClientLogo[] = [
   // 1행 = 기관, 2행 = 기업, 3행 = 나머지(순서 요청대로)
   { name: '함평군 농업기술센터',       src: clHampyeong,    scale: 1 },
   { name: '한국수목원정원관리원',       src: clKoagi,        scale: 1.15 },
-  { name: '대한상공회의소',           src: clKorcham,      scale: 1.7 },
+  { name: '대한상공회의소',           src: clKorcham,      scale: 1.7, denoise: true },
   { name: '경기도중독관리통합지원센터', src: clGcamc,        scale: 1 },
   { name: '아이디어두잇',             ideaSrc: clIdeadoitIdea, doitSrc: clIdeadoitDoit },
   { name: '설빙',                   src: clSulbing,      scale: 1 },
@@ -2315,9 +2318,15 @@ const CLIENTS: ClientLogo[] = [
   { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
   { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
-// Clients marquee 2-row 분리용 — CLIENTS 순서를 그대로 앞 6 / 뒤 6으로 나눈다(별도 데이터 아님).
-const CLIENTS_ROW_A = CLIENTS.slice(0, 6)
-const CLIENTS_ROW_B = CLIENTS.slice(6)
+// Clients를 reference(touchagraphic.com about-us) 방식대로 Institution/Brand 두 그룹으로 분리한다
+// — 실제 기관/기업 성격 기준(6/6으로 억지로 맞추지 않음). 공공기관·공사·협회·문화기관 = Institution,
+// 민간 기업 = Brand.
+const INSTITUTION_NAMES = new Set([
+  '함평군 농업기술센터', '한국수목원정원관리원', '대한상공회의소',
+  '경기도중독관리통합지원센터', '한국가스기술공사', '한국환경산업기술원', '대구오페라하우스',
+])
+const INSTITUTION_CLIENTS = CLIENTS.filter(c => INSTITUTION_NAMES.has(c.name))
+const BRAND_CLIENTS = CLIENTS.filter(c => !INSTITUTION_NAMES.has(c.name))
 
 // ── CERTIFICATIONS ────────────────────────────────────────────────────────────
 // 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
@@ -2401,16 +2410,33 @@ function CertificationSection() {
 }
 
 // 로고 한 칸 — box/card 없이 넓은 가로 field 위에 로고 자체가 놓이는 느낌을 위해 배경/테두리
-// 없이 높이 기준으로만 정렬한다(§완료보고 — touchagraphic.com 홈페이지처럼). 원본 비율이 제각각이라
-// width는 강제하지 않고 height 기준 + object-contain으로 맞추고, 로고별 캔버스 여백 차이는
-// CLIENTS의 scale 값으로만 보정한다.
+// 없이 높이 기준으로만 정렬한다(reference touchagraphic.com about 페이지의 .item-marquee와 동일
+// 원리 — 다만 reference는 250×90 고정 box + object-fit:cover지만, 우리 로고 asset은 reference처럼
+// 캔버스에 맞춰 미리 크롭돼 있지 않아 cover를 쓰면 로고가 잘린다. 원본을 임의로 재가공하지 않기
+// 위해 object-contain + height 기준 정렬을 유지한다). 로고별 캔버스 여백 차이는 CLIENTS의 scale
+// 값으로만 보정한다.
 function ClientLogoCell({ c }: { c: ClientLogo }) {
+  const scale = c.scale ?? 1
   return (
-    <div className="h-[46px] lg:h-[64px] flex items-center justify-center shrink-0 px-10 lg:px-16">
+    <div className="h-[52px] lg:h-[80px] flex items-center justify-center shrink-0 px-8 lg:px-14">
       {c.ideaSrc && c.doitSrc ? (
         <div className="flex items-center gap-2 lg:gap-2.5 h-full">
           <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" draggable={false} />
           <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" draggable={false} />
+        </div>
+      ) : c.denoise ? (
+        // korcham.png 원본 캔버스 네 변에 1px 불투명(alpha 251~255) 연회색(#cccccc) 테두리가
+        // export 시 실수로 같이 포함돼 있어 alpha-cut(반투명 기준)으로 안 지워진다. 재제작 대신
+        // overflow-hidden 창 안에서 원본을 살짝(4%) 더 확대해 그 1px 테두리만 밖으로 밀어낸다 —
+        // 로고 내용 자체는 원본 그대로.
+        <div className="h-full w-auto overflow-hidden flex items-center justify-center">
+          <img
+            src={c.src}
+            alt={c.name}
+            draggable={false}
+            className="cl-logo-denoise max-h-full w-auto object-contain"
+            style={{ transform: `scale(${scale * 1.04})` }}
+          />
         </div>
       ) : (
         <img
@@ -2418,14 +2444,44 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
           alt={c.name}
           draggable={false}
           className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} max-h-full w-auto object-contain`}
-          style={c.scale && c.scale !== 1 ? { transform: `scale(${c.scale})` } : undefined}
+          style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
         />
       )}
     </div>
   )
 }
+
+// reference의 .marquee-container 1개 = Institution 또는 Brand 한 그룹. 제목(Latin, reference와
+// 동일하게 Instrument Sans 대신 프로젝트 기본 sans 사용 — 새 webfont 추가는 범위 밖) + capsule
+// description(.clients-pill, index.css) + marquee + 하단 divider 순서로 reference 구조를 그대로 따른다.
+function ClientsRow({ title, desc, items, trackClass }: {
+  title: string
+  desc: string
+  items: ClientLogo[]
+  trackClass: 'clients-track-a' | 'clients-track-b'
+}) {
+  return (
+    <div className={SHELL}>
+      <div className="flex flex-wrap items-center gap-4 lg:gap-5">
+        <h3 className="text-black font-bold leading-none" style={{ fontSize: 'clamp(30px, 4.5vw, 50px)' }}>
+          {title}
+        </h3>
+        <span className="clients-pill text-black text-[13px] lg:text-[18px]" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
+          {desc}
+        </span>
+      </div>
+      <div className="clients-marquee border-b border-black mt-9 lg:mt-14 py-7 lg:py-9">
+        <div className={`clients-track ${trackClass}`}>
+          {[...items, ...items].map((c, i) => (
+            <ClientLogoCell key={`${trackClass}-${c.name}-${i}`} c={c} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Clients() {
-  const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
     <section id="clients" className="bg-white u-section scroll-mt-16 lg:scroll-mt-24">
       {/* .cl-logo(index.css)가 참조하는 alpha threshold filter — 화면에 그려지지 않는 정의 전용 SVG */}
@@ -2436,39 +2492,13 @@ function Clients() {
           </feComponentTransfer>
         </filter>
       </svg>
-      <div className={SHELL}>
-        <div className="flex flex-col gap-2">
-          <h2
-            className="text-black"
-            style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
-          >
-            Clients
-          </h2>
-          <p className="t-body text-black/50">기업과 기관의 달력 제작을 함께해왔습니다.</p>
-        </div>
-      </div>
-
-      {/* Institution/Brand로 의미 구분하지 않고 12개 로고를 6/6 두 row로 나눠 보여준다(§완료보고).
-          reference(touchagraphic.com about 페이지)의 client logo 영역은 Swiper 기반 무한 가로
-          marquee였다 — 같은 "끊김 없이 오른쪽에서 왼쪽으로 흐르는" concept만 순수 CSS
-          transform(.clients-track, index.css)으로 재구현했다. 각 row는 자기 로고 세트를 두 번
-          이어붙여 -50% translateX로 이음매 없이 반복하고, row별 속도를 다르게(42s/47s) 해 단조로움을
-          피한다. section 좌우 gutter 밖까지(SHELL 밖) 자연스럽게 흐르도록 이 트랙만 SHELL 바깥에 둔다. */}
-      <div className="mt-10 lg:mt-14 border-y border-black/10">
-        <div className="clients-marquee py-7 lg:py-10">
-          <div className="clients-track clients-track-a">
-            {[...CLIENTS_ROW_A, ...CLIENTS_ROW_A].map((c, i) => (
-              <ClientLogoCell key={`a-${c.name}-${i}`} c={c} />
-            ))}
-          </div>
-        </div>
-        <div className="clients-marquee py-7 lg:py-10 border-t border-black/10">
-          <div className="clients-track clients-track-b">
-            {[...CLIENTS_ROW_B, ...CLIENTS_ROW_B].map((c, i) => (
-              <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />
-            ))}
-          </div>
-        </div>
+      {/* reference(touchagraphic.com about-us)의 Institution/Brand 두 .marquee-container를 그대로
+          재현 — Clients 제목/서브카피 없이 Institution부터 바로 시작, 각 그룹은 자체 제목+pill+
+          marquee+divider를 가진다(§완료보고). Institution/Brand 사이 간격도 reference 실측(약 60px)에
+          맞춰 둔다. */}
+      <ClientsRow title="Institution" desc="TAG와 함께한 기관들 입니다" items={INSTITUTION_CLIENTS} trackClass="clients-track-a" />
+      <div className="mt-16 lg:mt-[60px]">
+        <ClientsRow title="Brand" desc="TAG와 함께한 브랜드들 입니다" items={BRAND_CLIENTS} trackClass="clients-track-b" />
       </div>
     </section>
   )

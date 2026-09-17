@@ -124,16 +124,20 @@ body {
   filter: url(#cl-mono-alpha-cut) contrast(1.6);
   mix-blend-mode: multiply;
 }
+/* 대한상공회의소(korcham.png)에도 같은 옅은 캔버스 노이즈가 사각형 테두리처럼 보여
+   alpha-cut만으로는 안 지워짐 — contrast만 추가(흰 배경 문제는 없어 blend는 불필요). */
+.cl-logo-denoise {
+  filter: url(#cl-mono-alpha-cut) contrast(1.6);
+}
 
-/* Clients marquee — 기존 touchagraphic.com about 페이지의 client logo 영역(Swiper 기반 무한
-   가로 스크롤)에서 "끊김 없이 오른쪽→왼쪽으로 흐르는 속도감/리듬"만 가져온다. 실제 구현은
-   라이브러리 없이 CSS transform만으로: 동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼
-   옮기면 이음매 없이 반복된다(§완료보고). JS rAF로 매 프레임 갱신하지 않아 애니메이션 비용이
-   거의 0에 가깝다. 두 row를 속도만 다르게(A 42s / B 47s) 흘려 단조로움을 깬다. */
+/* Clients marquee — touchagraphic.com about 페이지의 Institution/Brand 영역(.marquee-container,
+   실제 Swiper 기반 무한 가로 autoplay)을 그대로 재현한다. 라이브러리는 Swiper가 아니라 순수 CSS
+   transform만으로: 동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼 옮기면 이음매 없이
+   반복된다(§완료보고). JS rAF 없이 애니메이션 비용이 거의 0에 가깝다. reference는 shell 폭
+   안에서 overflow:hidden으로 잘리고 가장자리 fade가 없어 동일하게 mask 없이 구현한다.
+   Institution/Brand 두 row 속도를 다르게(42s / 47s) 해 단조로움을 깬다. */
 .clients-marquee {
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
 }
 .clients-track {
   display: flex;
@@ -153,6 +157,21 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .clients-track { animation: none; }
+}
+/* reference의 description pill(1px solid 검정 outline, 완전한 캡슐 형태) — border-radius가
+   pill 높이의 절반 이상이라 rounded-full과 시각적으로 동일하다. */
+.clients-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #000;
+  border-radius: 9999px;
+  padding: 0 16px;
+  height: 36px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .clients-pill { height: 44px; }
 }
 
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
