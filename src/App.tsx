@@ -2283,10 +2283,9 @@ function Service() {
 }
 
 // ── CLIENTS ──────────────────────────────────────────────────────────────────
-// 실제 공식 로고 asset + 통일된 monochrome block system. 원본 파일/색상은 그대로 두고,
-// 화면에서만 CSS filter(.cl-logo, index.css: brightness(0) + opacity)로 모든 로고를 같은
-// 짙은 gray 톤으로 통일한다 — brightness(0)은 원본 hue/명도와 무관하게 모든 로고를 동일한
-// "검정 실루엣"으로 만들어, 브랜드별로 톤이 갈리는 문제를 원천적으로 막는다.
+// 실제 공식 로고 asset, 원본 브랜드 컬러 그대로 표시(§완료보고 — 과거 brightness(0)/grayscale(1)로
+// 전부 단색 처리하던 것 제거). .cl-logo(index.css)는 이제 반투명 노이즈 제거용 alpha-cut filter만
+// 적용하고, .cl-logo-blend는 로고에 내장된 불투명 흰 배경만 지우는 mix-blend-mode만 적용한다.
 // scale: 로고마다 원본 캔버스 여백이 달라 동일 height로 맞춰도 체감 크기가 다르기 때문에 두는
 // 표시 전용 보정값(기본 1). 실제 내용이 캔버스 대부분을 차지하는 로고는 1, 캔버스에 여백이 큰
 // 로고(대한상공회의소·이글루코퍼레이션)만 확대해 시각 밀도를 맞춘다.
@@ -2316,6 +2315,9 @@ const CLIENTS: ClientLogo[] = [
   { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
   { name: '대구오페라하우스',          src: clDaeguOpera,   scale: 1, blend: true },
 ]
+// Clients marquee 2-row 분리용 — CLIENTS 순서를 그대로 앞 6 / 뒤 6으로 나눈다(별도 데이터 아님).
+const CLIENTS_ROW_A = CLIENTS.slice(0, 6)
+const CLIENTS_ROW_B = CLIENTS.slice(6)
 
 // ── CERTIFICATIONS ────────────────────────────────────────────────────────────
 // 원본 확인: 산업디자인 전문분야 종합(시각·제품·포장), 여성기업, 직접생산 3종.
@@ -2404,7 +2406,7 @@ function CertificationSection() {
 // CLIENTS의 scale 값으로만 보정한다.
 function ClientLogoCell({ c }: { c: ClientLogo }) {
   return (
-    <div className="h-[40px] lg:h-[52px] flex items-center justify-center shrink-0 px-8 lg:px-12">
+    <div className="h-[46px] lg:h-[64px] flex items-center justify-center shrink-0 px-10 lg:px-16">
       {c.ideaSrc && c.doitSrc ? (
         <div className="flex items-center gap-2 lg:gap-2.5 h-full">
           <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" draggable={false} />
@@ -2446,17 +2448,26 @@ function Clients() {
         </div>
       </div>
 
-      {/* Institution/Brand로 나누지 않고 12개 로고를 하나의 흐름으로 이어 보여준다(§완료보고).
+      {/* Institution/Brand로 의미 구분하지 않고 12개 로고를 6/6 두 row로 나눠 보여준다(§완료보고).
           reference(touchagraphic.com about 페이지)의 client logo 영역은 Swiper 기반 무한 가로
           marquee였다 — 같은 "끊김 없이 오른쪽에서 왼쪽으로 흐르는" concept만 순수 CSS
-          transform(.clients-track, index.css)으로 재구현했다. 동일 로고 세트를 두 번 이어붙여
-          -50% translateX로 이음매 없이 반복한다. section 좌우 gutter 밖까지(SHELL 밖) 자연스럽게
-          흐르도록 이 트랙만 SHELL 바깥에 둔다. */}
-      <div className="clients-marquee mt-8 lg:mt-10 border-y border-black/10 py-5 lg:py-7">
-        <div className="clients-track">
-          {[...CLIENTS, ...CLIENTS].map((c, i) => (
-            <ClientLogoCell key={`${c.name}-${i}`} c={c} />
-          ))}
+          transform(.clients-track, index.css)으로 재구현했다. 각 row는 자기 로고 세트를 두 번
+          이어붙여 -50% translateX로 이음매 없이 반복하고, row별 속도를 다르게(42s/47s) 해 단조로움을
+          피한다. section 좌우 gutter 밖까지(SHELL 밖) 자연스럽게 흐르도록 이 트랙만 SHELL 바깥에 둔다. */}
+      <div className="mt-10 lg:mt-14 border-y border-black/10">
+        <div className="clients-marquee py-7 lg:py-10">
+          <div className="clients-track clients-track-a">
+            {[...CLIENTS_ROW_A, ...CLIENTS_ROW_A].map((c, i) => (
+              <ClientLogoCell key={`a-${c.name}-${i}`} c={c} />
+            ))}
+          </div>
+        </div>
+        <div className="clients-marquee py-7 lg:py-10 border-t border-black/10">
+          <div className="clients-track clients-track-b">
+            {[...CLIENTS_ROW_B, ...CLIENTS_ROW_B].map((c, i) => (
+              <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />
+            ))}
+          </div>
         </div>
       </div>
     </section>

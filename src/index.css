@@ -107,39 +107,29 @@ body {
   .svc-row:hover .svc-arrow { transform: none; }
 }
 
-/* Clients — 실제 로고 색상을 그대로 두되(원본 파일 무변경) 화면에서만 하나의 짙은 gray 톤으로 통일.
-   brightness(0)은 원본 hue/명도와 무관하게 모든 로고를 동일한 검정 실루엣으로 만들어
-   브랜드별로 다른 gray tone이 생기는 걸 막는다. opacity로만 "근접 검정" 밀도를 낮춘다. */
+/* Clients — 로고는 원본 브랜드 컬러 그대로 표시한다(§완료보고: 이전에는 brightness(0)/grayscale(1)로
+   전부 단색 실루엣 처리해 원색이 죽어 있었음 — 제거). */
 /* 일부 로고 원본 PNG에 아주 옅은(반투명) 디자인 캔버스 그리드가 실수로 같이 export 돼 있다.
-   brightness(0)만 쓰면 그 반투명 그리드까지 검게 보여 지저분해지므로, alpha 0.5 미만은 완전히
-   지우는 SVG filter(#cl-mono-alpha-cut, 아래 Clients 컴포넌트에 정의)를 먼저 통과시켜
-   실제 로고 획(거의 불투명)만 남긴 뒤 brightness(0)으로 단색화한다. 원본 파일은 무변경. */
+   alpha 0.5 미만을 완전히 지우는 SVG filter(#cl-mono-alpha-cut, 아래 Clients 컴포넌트에 정의)만
+   통과시켜 그 반투명 노이즈만 제거한다 — 색상에는 영향 없음. 원본 파일은 무변경. */
 .cl-logo {
-  filter: url(#cl-mono-alpha-cut) brightness(0);
-  opacity: 0.8;
-  transition: opacity 200ms ease;
+  filter: url(#cl-mono-alpha-cut);
 }
 /* 일부 로고 파일은 투명 배경이 아니라 불투명 흰 배경 사각형이 내장돼 있어(원본 파일이라 수정 불가),
-   brightness(0)을 그대로 쓰면 배경까지 검게 칠해져 로고가 안 보인다. 이 경우는 blend-mode로
-   흰 배경만 카드 배경에 녹여 없앤다(로고 자체가 이미 진한 단색이라 grayscale만으로 충분). */
+   그대로 두면 section의 흰 배경과 이질감 없이 섞여야 하는데 사각형 경계가 도드라진다. 이 경우는
+   grayscale 없이 mix-blend-mode: multiply만 적용해 흰 배경만 제거하고 원본 컬러는 그대로 남긴다.
+   alpha-cut도 함께 적용 — mix-blend-mode:multiply는 순백(255,255,255)만 지우고 옅은 반투명
+   그리드 노이즈(순백이 아닌 밝은 회색)는 그대로 보이므로, alpha 채널 기준으로 먼저 지운다. */
 .cl-logo-blend {
-  filter: grayscale(1) contrast(9);
-  opacity: 0.85;
+  filter: url(#cl-mono-alpha-cut) contrast(1.6);
   mix-blend-mode: multiply;
-  transition: opacity 200ms ease;
-}
-@media (hover: hover) and (pointer: fine) {
-  .cl-logo:hover, .cl-logo-blend:hover { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cl-logo, .cl-logo-blend { transition: none; }
 }
 
 /* Clients marquee — 기존 touchagraphic.com about 페이지의 client logo 영역(Swiper 기반 무한
    가로 스크롤)에서 "끊김 없이 오른쪽→왼쪽으로 흐르는 속도감/리듬"만 가져온다. 실제 구현은
    라이브러리 없이 CSS transform만으로: 동일한 로고 세트를 두 번 이어붙인 트랙을 -50% 만큼
-   옮기면 이음매 없이 반복된다(§완료보고). JS rAF로 매 프레임 갱신하지 않아 12개 로고 애니메이션
-   비용이 거의 0에 가깝다. */
+   옮기면 이음매 없이 반복된다(§완료보고). JS rAF로 매 프레임 갱신하지 않아 애니메이션 비용이
+   거의 0에 가깝다. 두 row를 속도만 다르게(A 42s / B 47s) 흘려 단조로움을 깬다. */
 .clients-marquee {
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
@@ -148,8 +138,12 @@ body {
 .clients-track {
   display: flex;
   width: max-content;
-  animation: clients-marquee 42s linear infinite;
+  animation-name: clients-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
+.clients-track-a { animation-duration: 42s; }
+.clients-track-b { animation-duration: 47s; }
 @keyframes clients-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
