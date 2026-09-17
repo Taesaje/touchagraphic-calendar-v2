@@ -16,6 +16,133 @@
   --font-family-mono: 'Courier New', 'Courier', monospace;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   GLOBAL MOTION SYSTEM — media-palette.co.kr을 Chrome으로 실측 관찰한
+   motion rhythm(native scroll, line 단위 clip-reveal 헤드라인, section
+   진입 시 절제된 fade/translate, 반복 없는 1회성 reveal)을 Touchagraphic
+   editorial 언어(hairline/black-white/큰 typography) 위에 얹는 token
+   레이어. 값을 페이지 곳곳에 --duration:.3s 식으로 난립시키지 않고
+   이 4개 duration + 2개 easing만 재사용한다(§완료보고).
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --motion-fast: 220ms;     /* hover / button / nav dot */
+  --motion-base: 480ms;     /* card / accordion 류 구조적 전환 */
+  --motion-reveal: 780ms;   /* 기본 section/content reveal */
+  --motion-slow: 1050ms;    /* media settle 등 가장 느린 motion */
+  /* 기존 .pf-card/.svc-arrow에 이미 쓰이던 값 — 이 프로젝트의 암묵적
+     editorial ease였다. 이번에 토큰화해서 전역에서 재사용한다. */
+  --ease-out-editorial: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-base: 1ms;
+    --motion-reveal: 1ms;
+    --motion-slow: 1ms;
+  }
+}
+
+/* ── Reveal system ─────────────────────────────────────────────────
+   useScrollReveal()(App.tsx)이 IntersectionObserver로 [data-reveal]과
+   .reveal-clip-line 요소를 관찰하다가 최초 진입 시 .is-inview를 한 번만
+   추가한다(반복 재생 없음). scroll마다 React state를 바꾸지 않고 CSS
+   transform/opacity만 사용 — layout thrashing 없음.
+   variant: up(기본 content) / media(사진 settle, 명시적으로 선택한
+   곳에만) / marquee(Clients — fade-in + track 최초 진입 전 pause) /
+   line(hairline draw). data-reveal-delay="90" 처럼 ms 단위 stagger. */
+[data-reveal="up"] {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition: opacity var(--motion-reveal) var(--ease-out-editorial),
+              transform var(--motion-reveal) var(--ease-out-editorial);
+}
+[data-reveal="up"].is-inview {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+/* 사진처럼 "결이 큰" media에만 명시적으로 사용 — Portfolio 썸네일/
+   Estimator preview/Clients 로고에는 절대 쓰지 않는다(§완료보고). */
+[data-reveal="media"] {
+  overflow: hidden;
+}
+[data-reveal="media"] > img,
+[data-reveal="media"] > [data-reveal-media-target] {
+  transform: scale(1.035);
+  transition: transform var(--motion-slow) var(--ease-soft);
+}
+[data-reveal="media"].is-inview > img,
+[data-reveal="media"].is-inview > [data-reveal-media-target] {
+  transform: scale(1);
+}
+/* Clients marquee 전용 — viewport 진입 전에는 track 애니메이션을 멈춰
+   두고(이미 중간 상태로 돌고 있는 로고를 보여주지 않기 위해), 최초
+   진입 시 row 전체가 fade-in되며 marquee가 자연스럽게 시작된다. */
+[data-reveal="marquee"] {
+  opacity: 0;
+  transition: opacity var(--motion-reveal) var(--ease-out-editorial);
+}
+[data-reveal="marquee"].is-inview {
+  opacity: 1;
+}
+[data-reveal="marquee"] .clients-track {
+  animation-play-state: paused;
+}
+[data-reveal="marquee"].is-inview .clients-track {
+  animation-play-state: running;
+}
+/* hairline draw — border를 가진 content box가 아니라 내용 없는 순수
+   구분선 요소에만 사용한다(로고/카드가 같이 늘어나 보이는 것을 방지). */
+[data-reveal="line"] {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--motion-reveal) var(--ease-out-editorial);
+}
+[data-reveal="line"].is-inview {
+  transform: scaleX(1);
+}
+/* 큰 typography 전용 — overflow:hidden wrapper(.reveal-clip-line) 안에서
+   줄 단위로 아래(105%)에서 제자리로 올라온다("인쇄물이 정렬되며
+   등장하는" 감각, §완료보고). Hero/Portfolio/OUR PARTNER.에만 사용 —
+   일반 본문 reveal([data-reveal="up"])과 다른 언어로 남겨둔다. */
+.reveal-clip-line {
+  display: block;
+  overflow: hidden;
+}
+.reveal-clip-inner {
+  display: block;
+  transform: translate3d(0, 105%, 0);
+  transition: transform var(--motion-reveal) var(--ease-soft);
+}
+.reveal-clip-line.is-inview .reveal-clip-inner {
+  transform: translate3d(0, 0, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal="up"],
+  [data-reveal="media"] > img,
+  [data-reveal="media"] > [data-reveal-media-target],
+  [data-reveal="marquee"],
+  [data-reveal="line"],
+  .reveal-clip-inner {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  [data-reveal="marquee"] .clients-track {
+    animation-play-state: running;
+  }
+}
+/* Mobile — reveal distance/시간을 desktop보다 절제한다(§완료보고). */
+@media (max-width: 768px) {
+  [data-reveal="up"] {
+    transform: translate3d(0, 18px, 0);
+    transition-duration: var(--motion-base);
+  }
+  .reveal-clip-inner {
+    transition-duration: var(--motion-base);
+  }
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -69,8 +196,8 @@ body {
 .pf-card {
   position: relative;
   transition:
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform var(--motion-fast) var(--ease-out-editorial),
+    box-shadow var(--motion-fast) var(--ease-out-editorial);
 }
 @media (hover: hover) and (pointer: fine) {
   .pf-card:hover {
@@ -89,10 +216,10 @@ body {
 /* Service row hover — 우측 orange arrow 만 살짝 오른쪽으로 + divider 아주 미세하게 진해짐.
    row / 다른 요소는 불변(layout shift 없음). 실제 link 아님 → cursor pointer / underline / background 효과 없음. */
 .svc-arrow {
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--motion-fast) var(--ease-out-editorial);
 }
 .svc-row {
-  transition: border-color 240ms ease-out;
+  transition: border-color var(--motion-fast) var(--ease-out-editorial);
 }
 @media (hover: hover) and (pointer: fine) {
   .svc-row:hover .svc-arrow {
@@ -201,12 +328,14 @@ body {
 }
 
 /* FAQ accordion — 답변 패널 height(JS 실측 scrollHeight)를 0↔auto 로 부드럽게 (bounce 없음).
-   panel 아래 Contact 가 자연스럽게 밀려 내려가고 올라옴. 초기값은 닫힘. */
+   panel 아래 Contact 가 자연스럽게 밀려 내려가고 올라옴. 초기값은 닫힘. 340ms/260ms는 global
+   motion token 범위(300~420ms) 안에서 editorial ease로 통일한 값이다(§완료보고 — 기존 280ms
+   plain ease에서 조정). */
 .faq-panel {
   height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: height 280ms ease, opacity 200ms ease;
+  transition: height 340ms var(--ease-out-editorial), opacity 260ms var(--ease-out-editorial);
 }
 @media (prefers-reduced-motion: reduce) {
   .faq-panel { transition: none; }
