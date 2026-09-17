@@ -53,11 +53,23 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
   - `/inquiry?type=estimate`(InquiryPage)도 같은 `COVER_DESIGN_FAMILIES`/`INNER_DESIGNS`/`DesignGrid`를
     공유하므로 이미지·framing이 자동으로 동일하게 반영됨(중복 데이터 없음). 단 "6개 중 1개 선택"
     sublabel 위계 변경은 InquiryPage에는 적용 안 됨(원래 그 문구 자체가 없었음).
-- Landing Clients 섹션(`src/App.tsx` `Clients`/`ClientLogoCell`, `src/index.css` `.cl-logo`/`.cl-logo-blend`/
-  `.clients-marquee`) — 12개 로고를 6/6 두 개의 독립 CSS marquee row(속도 42s/47s, 오른쪽→왼쪽,
-  hover 시 해당 row만 pause, `prefers-reduced-motion` 지원)로 분리하고, 과거 brightness(0)/grayscale(1)로
-  전부 단색 실루엣 처리하던 필터를 제거해 원본 브랜드 컬러 그대로 표시하도록 변경(2026-09-17).
-  row 높이·로고 주변 여백도 확대. 로고 데이터(`CLIENTS`)와 개별 scale 보정값은 변경 없음.
+- Landing Clients 섹션(`src/App.tsx` `Clients`/`ClientsRow`/`ClientLogoCell`, `src/index.css` `.cl-logo`/
+  `.cl-logo-blend`/`.cl-logo-denoise`/`.clients-marquee`/`.clients-pill`) — touchagraphic.com
+  about-us 레퍼런스의 Institution/Brand 두 `.marquee-container` 구조를 그대로 재현(2026-09-17,
+  이전의 "Clients 제목 + 6/6 무구분 2-row" 버전은 폐기).
+  - `Clients` 공통 제목/서브카피 제거, Institution부터 바로 시작. 각 그룹은 제목(Institution/Brand,
+    Latin) + 검정 1px outline capsule 설명(`.clients-pill`: "TAG와 함께한 기관들 입니다" /
+    "TAG와 함께한 브랜드들 입니다") + 자체 CSS marquee + 하단 divider 순서.
+  - 로고는 `INSTITUTION_CLIENTS`/`BRAND_CLIENTS`(`CLIENTS` 원본 배열에서 실제 기관/기업 성격 기준
+    필터링, 7/5) — 개수를 억지로 맞추지 않음.
+  - marquee는 라이브러리 없이 순수 CSS transform(두 row 속도 42s/47s, 오른쪽→왼쪽, hover 시 해당
+    row만 pause, `prefers-reduced-motion` 지원). 원본 브랜드 컬러 그대로 표시(grayscale/opacity감소/
+    blend colorization 없음 — `.cl-logo-blend`는 로고에 내장된 불투명 흰 배경 제거에만 사용).
+  - 대한상공회의소(`korcham.png`) 원본 캔버스 4변에 실수로 포함된 1px 불투명 연회색 테두리는
+    `.cl-logo-denoise`(overflow-hidden 창 안에서 원본을 4% 확대해 테두리만 밖으로 밀어냄)로 해결 —
+    이미지 재제작 없음.
+  - 알려진 과제: `설빙`(`sulbing.png`, 원본 163×31px)은 다른 로고 대비 저해상도라 확대 시 흐림 —
+    고해상도 원본/SVG 확보 시 교체 권장(§5 참고).
 - `AGENTS.md`에 Engineering Guardrails 추가(작업 위험도별 대응, 기술부채 보고, Architecture Audit 기준 등)
 - Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포)
 - `npm run publish:v2` — build → safe staging → commit → push 자동화(기존 검증 완료)
