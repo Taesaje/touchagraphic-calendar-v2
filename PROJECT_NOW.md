@@ -54,23 +54,29 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
     공유하므로 이미지·framing이 자동으로 동일하게 반영됨(중복 데이터 없음). 단 "6개 중 1개 선택"
     sublabel 위계 변경은 InquiryPage에는 적용 안 됨(원래 그 문구 자체가 없었음).
 - Landing Clients/Partner 섹션(`src/App.tsx` `Clients`/`ClientsRow`/`ClientLogoCell`,
-  `src/index.css` `.cl-logo`/`.cl-logo-blend`/`.cl-logo-denoise`/`.clients-marquee`) —
-  touchagraphic.com about-us `.about-sec03`의 구조적 DNA(OUR PARTNER naming, Institution/Brand
-  grouping, horizontal logo flow, thin divider)만 가져오고 exact 수치는 V2 전체 hierarchy에
-  맞춰 다시 잡음(2026-09-17, reference 그대로 복제했던 104px title/모든 pill 버전은 폐기 — V2
-  안에서 시선의 중심이 여러 개 생기는 문제가 있었음).
-  - "OUR PARTNER."만 유일한 main title(`clamp(40px,6.5vw,80px)`/600 — Hero h1 최대 80px을
-    넘지 않게 조정, pill 없음).
-  - Institution/Brand는 secondary label(`clamp(24px,2.8vw,36px)`/700) + pill 없이 plain
-    supporting copy("TAG와 함께한 기관들/브랜드들 입니다", black/50, border 없음) — 각각 자체
-    marquee + 옅은 divider(`border-black/20`). `INSTITUTION_CLIENTS`/`BRAND_CLIENTS`(`CLIENTS`
-    원본 배열에서 실제 기관/기업 성격 기준 필터링, 7/5).
-  - 로고는 고정 slot(`CLIENT_SLOT`/`CLIENT_LOGO_SIZE`, 데스크톱 220×74px대, reference보다 넓게
-    잡아 화면당 5~7개만 보이게) + object-contain optical normalization. marquee는 라이브러리
-    없이 순수 CSS transform, 속도를 52s/58s로 늦춰 차분한 톤에 맞춤(오른쪽→왼쪽, hover pause,
-    `prefers-reduced-motion` 지원). 원본 브랜드 컬러 그대로 표시.
-  - 대한상공회의소(`korcham.png`) 1px 테두리 `.cl-logo-denoise` 처리 유지.
-  - 알려진 과제: `설빙`(`sulbing.png`, 원본 163×31px)은 다른 로고 대비 저해상도라 확대 시 흐림 —
+  `src/index.css` `.cl-logo`/`.cl-logo-blend`/`.cl-logo-denoise`/`.clients-marquee`/
+  `.clients-row-pill`) — touchagraphic.com about-us `.about-sec03`의 구조적 DNA(OUR PARTNER
+  naming, Institution/Brand grouping, horizontal logo flow, thin divider)만 가져오고 exact
+  수치는 V2 전체 hierarchy에 맞춰 다시 잡음(2026-09-17).
+  - "OUR PARTNER."만 유일한 main title(`clamp(40px,6.5vw,80px)`/600, Hero h1 최대 80px을
+    넘지 않음, pill 없음). Institution/Brand는 secondary label(`clamp(24px,2.8vw,36px)`/700)
+    + 절제된 outline capsule(`.clients-row-pill`, "TAG와 함께한 기관들/브랜드들 입니다",
+    text `rgba(0,0,0,.78)`) — 각자 marquee + 옅은 divider(`border-black/20`).
+    `INSTITUTION_CLIENTS`/`BRAND_CLIENTS`(`CLIENTS` 원본 배열에서 실제 기관/기업 성격 기준
+    필터링, 7/5).
+  - 로고는 고정 slot(`CLIENT_SLOT`, 데스크톱 260×74px, 화면당 5~7개) + 실제 max-height/
+    max-width(`CLIENT_LOGO_BASE`/`logoBoxStyle`, 데스크톱 38×190px 기준, `sizeBoost`
+    0.85~1.15로 실치수 보정)로 optical normalization. 개별 로고의 CSS `transform:scale()`은
+    제거(대한상공회의소의 1px 테두리 crop용 `scale(1.04)`만 예외) — continuous marquee 중
+    track transform과 겹쳐 불안정해지는 것을 방지. marquee 속도 52s/58s, `will-change:
+    transform` + `translate3d`, 좌우 28px edge fade. 원본 브랜드 컬러 그대로 표시.
+  - asset audit(canvas 픽셀 샘플링) 결과 12개 중 실제 캔버스 노이즈/테두리가 있는 건
+    대한상공회의소·대구오페라하우스·이글루코퍼레이션뿐이라 나머지 로고에서 `.cl-logo`의
+    alpha-cut SVG filter를 제거함(불필요한 filter는 애니메이션 중 GPU 합성 부담과 anti-aliasing
+    손상 위험이 있어 "정상 asset → runtime filter 없음" 원칙 적용).
+  - 알려진 과제: `설빙`(`sulbing.png`, 원본 163×31px)은 다른 로고 대비 저해상도라 확대 시 흐림
+    — reference(touchagraphic.com about-us)의 현재 노출 클라이언트 로고 세트는 우리 12개와
+    대부분 다른 회사라(한국수목원정원관리원만 일치 추정) 직접 대체할 clean source를 못 찾음,
     고해상도 원본/SVG 확보 시 교체 권장(§5 참고).
 - `AGENTS.md`에 Engineering Guardrails 추가(작업 위험도별 대응, 기술부채 보고, Architecture Audit 기준 등)
 - Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포)
