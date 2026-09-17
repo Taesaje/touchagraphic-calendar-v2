@@ -67,45 +67,71 @@ import certDesignSvc  from '@/imports/certifications/direct-production-design-se
 const SHELL = 'u-shell'
 
 // ── GLOBAL MOTION SYSTEM ─────────────────────────────────────────────────────
-// media-palette.co.kr을 실측 관찰해 얻은 motion rhythm(native scroll, line 단위
-// clip-reveal 헤드라인, section 진입 시 1회성 fade/translate reveal)을 이 프로젝트의
-// editorial 언어 위에 얹는 중앙 시스템(§완료보고). 각 section에서 IntersectionObserver를
-// 따로 만들지 않고 App 루트에서 useScrollReveal() 한 번만 초기화해 [data-reveal]/
-// .reveal-clip-line 요소를 전부 관찰한다 — scroll마다 React state를 바꾸지 않고
-// class 토글 + CSS transform/opacity만 사용(layout thrashing 없음).
-function staggerMs(i: number, step = 70, cap = 280) {
+// media-palette.co.kr을 실측 관찰해 얻은 motion rhythm을 이 프로젝트의 editorial 언어 위에
+// 얹는 중앙 시스템(§완료보고 1차). 2차 패스 — 1차는 개별 element가 거의 동시에 나타나는
+// 문제가 있었다. 원인: (a) trigger 지점이 얕아(rootMargin -10%) 한 화면 안의 여러 element가
+// 비슷한 scroll 시점에 한꺼번에 관찰되고, (b) delay/duration 값 자체가 작아(70~320ms,
+// 780ms) 시퀀스가 300ms 안에 다 끝났다. 이번에는:
+//  1) trigger를 더 깊게(rootMargin -24%)해 "충분히 들어온 뒤" 시작하고,
+//  2) delay 값을 major hierarchy 사이 180~320ms, repeat item 사이 90~140ms로 키우고,
+//  3) "같은 화면 안 hierarchy"는 TIME SEQUENCE(data-reveal-delay), "다음 화면/sub-group"은
+//     SCROLL POSITION(별도 element의 독립적 IntersectionObserver 진입)으로 구분한다.
+// Clients의 marquee row(Institution/Brand)만 예외 — 같은 rootMargin으로는 두 row가 한 화면
+// 안에서 함께 trigger될 만큼 가까워서, marquee 전용 "chapter" observer(rootMargin 0,
+// threshold 0.35 — 실제로 화면에 뚜렷이 들어와야 시작)를 별도로 둔다. observer는 이 2개뿐이다
+// (standard/chapter) — element마다 observer를 만들지 않는다.
+function staggerMs(i: number, step = 110, cap = 420) {
   return Math.min(i * step, cap)
 }
 function useScrollReveal(resetKey: unknown) {
   useEffect(() => {
-    const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal], .reveal-clip-line'))
-    if (targets.length === 0) return
+    const allTargets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal], .reveal-clip-line'))
+    if (allTargets.length === 0) return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduce) {
-      targets.forEach(el => el.classList.add('is-inview'))
+      allTargets.forEach(el => el.classList.add('is-inview'))
       return
     }
-    // data-reveal-delay(ms)는 CSS가 읽을 수 없어 관찰 시작 전에 transitionDelay로 옮겨둔다.
-    targets.forEach(el => {
-      const delay = el.dataset.revealDelay
-      if (delay) el.style.transitionDelay = `${delay}ms`
-    })
-    const io = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-inview')
-          io.unobserve(entry.target)
+    const isMobile = window.innerWidth < 768
+    function activate(entry: IntersectionObserverEntry, observer: IntersectionObserver) {
+      const el = entry.target as HTMLElement
+      const raw = Number(el.dataset.revealDelay || 0)
+      // 빠르게 스크롤해서 element가 이미 화면 상단 35% 위까지 지나친 상태로 처음 관찰되면
+      // (fast scroll) delay를 크게 줄여 즉시 따라잡는다 — 느린 scroll에서는 cinematic
+      // hierarchy, 빠른 scroll에서는 정보 접근성을 우선한다(§완료보고).
+      const passedFast = entry.boundingClientRect.top < window.innerHeight * 0.35
+      // 모바일은 major phase delay를 desktop의 약 78%로 줄인다(거리/시간은 CSS에서 축소).
+      const scaled = raw * (isMobile ? 0.78 : 1) * (passedFast ? 0.2 : 1)
+      el.style.transitionDelay = `${Math.round(scaled)}ms`
+      el.classList.add('is-inview')
+      observer.unobserve(el)
+    }
+    function makeObserver(opts: IntersectionObserverInit) {
+      const observer = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) activate(entry, observer)
         }
-      }
-    }, { threshold: 0.14, rootMargin: '0px 0px -10% 0px' })
-    targets.forEach(el => io.observe(el))
-    return () => io.disconnect()
+      }, opts)
+      return observer
+    }
+    // standard — 대부분의 reveal(heading/본문/카드/hairline 등). 뷰포트 하단에서 24% 만큼
+    // 들어온 뒤에야 시작해 "section에 걸치자마자 전부 시작"하는 문제를 줄인다.
+    const standardIO = makeObserver({ threshold: 0.12, rootMargin: '0px 0px -24% 0px' })
+    // chapter — Clients marquee row 전용. Institution row가 화면을 벗어나기 전에 Brand row가
+    // 미리 활성화되지 않도록 rootMargin 여유 없이 실제로 뚜렷이 들어와야 시작한다.
+    const chapterIO = makeObserver({ threshold: 0.35, rootMargin: '0px' })
+    allTargets.forEach(el => {
+      if (el.dataset.reveal === 'marquee') chapterIO.observe(el)
+      else standardIO.observe(el)
+    })
+    return () => { standardIO.disconnect(); chapterIO.disconnect() }
   }, [resetKey])
 }
 // 큰 typography만 쓰는 줄 단위 clip reveal(Hero/Portfolio/OUR PARTNER. 전용 — index.css의
 // .reveal-clip-line/.reveal-clip-inner 참고). 일반 본문은 data-reveal="up"을 쓰고 이 컴포넌트는
-// "인쇄물이 정렬되며 등장하는" 감각이 필요한 소수의 대형 헤드라인에만 쓴다.
-function RevealLines({ lines, as = 'span', delayStep = 110, baseDelay = 0, lineClassName }: {
+// "인쇄물이 정렬되며 등장하는" 감각이 필요한 소수의 대형 헤드라인에만 쓴다. line stagger는
+// 160~200ms 범위(§완료보고 2차 — 1차의 110ms는 두 줄이 거의 붙어 나와 옅었다).
+function RevealLines({ lines, as = 'span', delayStep = 180, baseDelay = 0, lineClassName }: {
   lines: string[]
   as?: 'span' | 'div'
   delayStep?: number
@@ -723,18 +749,20 @@ function Hero() {
                   또렷이 분리돼 읽힌다. 여기서는 우리 폰트가 이미 더 크고(clamp 상한 80px) 볼드가 강해
                   1.33까지 다 따라가면 오히려 느슨해 보여서, "겹쳐 보이지 않으면서도 압도감은 유지"되는
                   1.28로 절충했다. 2줄은 <br/> 대신 RevealLines로 각 줄을 overflow-hidden wrapper에 담아
-                  media-palette.co.kr에서 실측한 "줄 단위 clip reveal"(§완료보고)을 그대로 재현한다. */}
+                  media-palette.co.kr에서 실측한 "줄 단위 clip reveal"(§완료보고)을 그대로 재현한다.
+                  2차 패스 — eyebrow(0) → line1(180) → line2(320) → supporting(600) → hairline(880)
+                  순으로 명확한 4단계 stagger(전체 핵심 화면 완성 ≈1.3~1.5s, line1은 그 전에 읽힘). */}
               <h1
                 className="lg:col-span-7 min-w-0 text-black"
                 style={{ ...fontKr, fontWeight: 700, fontSize: 'clamp(36px, 5.2vw, 80px)', lineHeight: 1.28, letterSpacing: '-0.025em' }}
               >
-                <RevealLines lines={['기업 / 기관', '달력 제작 회사']} baseDelay={70} delayStep={120} />
+                <RevealLines lines={['기업 / 기관', '달력 제작 회사']} baseDelay={180} delayStep={140} />
               </h1>
 
               {/* 우: supporting — headline 2번째 줄 기준선에 맞춰 하단 정렬. 위계: 1줄 medium(500) / 2줄 bold(700).
-                  title clip-reveal(두 줄, ~70~190ms)이 거의 자리잡을 때 뒤따라오도록 delay 320ms. */}
+                  title clip-reveal(두 줄, 180/320ms)이 자리잡은 뒤 뒤따라오도록 delay 600ms. */}
               <div className="lg:col-span-4 lg:col-start-9 min-w-0 flex lg:items-end lg:justify-end">
-                <div className="max-w-[540px] text-black lg:text-right" style={fontKr} data-reveal="up" data-reveal-delay="320">
+                <div className="max-w-[540px] text-black lg:text-right" style={fontKr} data-reveal="up" data-reveal-delay="600">
                   <span
                     className="block"
                     style={{ fontWeight: 500, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.015em' }}
@@ -746,7 +774,7 @@ function Hero() {
                     style={{ fontWeight: 700, fontSize: 'clamp(18px, 2.1vw, 32px)', lineHeight: 1.35, letterSpacing: '-0.02em' }}
                   >
                     기획부터
-                    <span aria-hidden className="inline-block h-px w-16 shrink-0 bg-black/35" data-reveal="line" data-reveal-delay="420" />
+                    <span aria-hidden className="inline-block h-px w-16 shrink-0 bg-black/35" data-reveal="line" data-reveal-delay="880" />
                     제작까지 함께합니다
                   </span>
                 </div>
@@ -1116,17 +1144,18 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
       <div className={SHELL}>
         <div id="portfolio-scroll-target" className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. "Portfolio" caption과
-                우측 컨트롤은 heading보다 살짝 늦게(80ms) 따라와 위계를 강조한다. */}
+            {/* 큰 heading은 Hero와 같은 언어(§완료보고 §8) — 줄 단위 clip reveal. PHASE 1 heading(0) →
+                PHASE 2 caption/컨트롤(250) → PHASE 3 rail(520) → PHASE 4 첫 카드(680+, §완료보고
+                2차 — 같은 화면 안 hierarchy를 명확한 time sequence로 분리). */}
             <h2
               className="text-black"
               style={{ fontFamily: 'Noto Sans KR, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4.1vw, 66px)', lineHeight: 1.15, letterSpacing: '-0.025em' }}
             >
               <RevealLines lines={['제작 사례']} />
             </h2>
-            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="80">Portfolio</span>
+            <span className="t-caption text-black/45" data-reveal="up" data-reveal-delay="250">Portfolio</span>
           </div>
-          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="80">
+          <div className="flex items-center gap-4 shrink-0" data-reveal="up" data-reveal-delay="250">
             {/* prev/next — 데스크톱 전용, hairline circle. 모바일은 스와이프에 위임 */}
             <div className="hidden lg:flex items-center gap-2">
               <button
@@ -1181,7 +1210,7 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
         }}
         className="mt-1 lg:mt-[20px] [&::-webkit-scrollbar]:hidden"
         data-reveal="up"
-        data-reveal-delay="180"
+        data-reveal-delay="520"
       >
         <div
           ref={trackRef}
@@ -1192,10 +1221,11 @@ function Portfolio({ navigate }: { navigate: (path: string) => void }) {
               복제 세트(clone)는 스크린리더 중복 방지를 위해 aria-hidden 처리. */}
           {[...PORTFOLIO, ...PORTFOLIO].map((item, i) => {
             const isClone = i >= PORTFOLIO.length
-            // 처음 보이는 실카드 3~4개에만 아주 작은 stagger(§완료보고) — clone·나머지 카드는
-            // 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft 실측)에 영향 없이 그대로 보인다.
+            // PHASE 4 — rail(520ms) 다음 처음 보이는 실카드 4개만 120ms 간격 stagger(§완료보고
+            // 2차). clone·나머지 카드는 이미 in-view 상태로 렌더돼 자동 슬라이드 로직(offsetLeft
+            // 실측)에 영향 없이 그대로 보인다.
             const revealProps = !isClone && i < 4
-              ? { 'data-reveal': 'up', 'data-reveal-delay': String(220 + staggerMs(i, 75, 225)) }
+              ? { 'data-reveal': 'up', 'data-reveal-delay': String(680 + staggerMs(i, 120, 400)) }
               : {}
             return (
             <button
@@ -1959,8 +1989,10 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
   return (
     <div className="bg-white">
       {/* ── 마스트헤드 ── (브랜드: 큰 gothic 타이틀 + 옆에 얇은 라운드 라벨 + CMYK 도트) —
-          heading → preview(100ms) → configurator(170ms) 순으로 최초 진입 시에만 stagger reveal
-          (§완료보고). 이후 option click/accordion interaction은 기존 기능 motion 그대로 유지. */}
+          heading(0) → preview(350ms) → configurator(600ms) 순으로 최초 진입 시에만 stagger
+          reveal(§완료보고 2차 — "견적 계산기구나" → "결과를 보고" → "옵션을 고르는구나" 순서로
+          인지되도록 간격을 키웠다). 이후 option click/accordion interaction은 기존 기능 motion
+          그대로 유지, delay 없음. */}
       <div id="estimator-scroll-target" className="border-b border-ink pb-6 mb-9 scroll-mt-[88px] lg:scroll-mt-[120px]" data-reveal="up">
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
           <div className="min-w-0">
@@ -2000,7 +2032,7 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
             자체를 분리한다(§완료보고) — standby는 원래 쓰던 밝은 배경 wireframe 대기 화면
             (commit 341e391 기준으로 복원), selected는 검은 배경 + selection preview asset 전용
             프레이밍(1800×1311, §BigPreviewImage)을 그대로 쓴다. */}
-        <div className="lg:sticky lg:top-[104px]" data-reveal="up" data-reveal-delay="100">
+        <div className="lg:sticky lg:top-[104px]" data-reveal="up" data-reveal-delay="350">
           {hasSelectedDesign ? (
             <div
               className="relative flex items-center justify-center overflow-hidden"
@@ -2038,7 +2070,7 @@ function EstimatorInline({ onConsult, initialSnapshot }: {
         </div>
 
         {/* 우: progressive accordion */}
-        <div data-reveal="up" data-reveal-delay="170">
+        <div data-reveal="up" data-reveal-delay="600">
           <div className="border-b border-ink/15">
             {steps.map((s, i) => {
               const st = stepState(s)
@@ -2444,12 +2476,17 @@ function CertificationSection() {
           </p>
         </div>
 
+        {/* desktop에서는 주요 인증/직접생산 두 그룹이 같은 화면(좌우 컬럼)에 나란히 있어
+            scroll position만으로는 분리되지 않는다 — §15 원칙대로 "같은 화면 hierarchy"는
+            TIME SEQUENCE로 분리한다(§완료보고 2차). STEP1 section heading(0) → STEP2 주요 인증
+            heading(300)+항목(410~) → STEP3 직접생산 heading(650, 두 그룹을 동시에 깨우지 않도록
+            충분히 늦춤)+항목(760~). */}
         <div className="mt-8 lg:mt-12 grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-10" style={fontKr}>
           <div className="min-w-0">
-            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">주요 인증 및 자격</h3>
+            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5" data-reveal="up" data-reveal-delay="300">주요 인증 및 자격</h3>
             <div className="grid grid-cols-2 gap-3 lg:gap-5">
               {CORE_CERTIFICATIONS.map((c, i) => (
-                <figure key={c.label} className="min-w-0" data-reveal="up" data-reveal-delay={150 + staggerMs(i, 70, 280)}>
+                <figure key={c.label} className="min-w-0" data-reveal="up" data-reveal-delay={410 + staggerMs(i, 110, 400)}>
                   <div className="bg-[#FAFAF7] border border-black/[0.06] p-2 lg:p-4">
                     <img src={c.src} alt={c.alt} className="w-full h-[180px] sm:h-[220px] lg:h-[260px] object-contain" loading="lazy" />
                   </div>
@@ -2464,10 +2501,10 @@ function CertificationSection() {
             </div>
           </div>
           <div className="min-w-0 border-t border-black/15 pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
-            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5">직접생산확인증명서</h3>
+            <h3 className="text-[18px] lg:text-[22px] font-bold text-black mb-5" data-reveal="up" data-reveal-delay="650">직접생산확인증명서</h3>
             <div className="grid grid-cols-3 gap-3 lg:gap-5">
               {PRODUCTION_CERTIFICATIONS.map((c, i) => (
-                <figure key={c.label} className="min-w-0" data-reveal="up" data-reveal-delay={150 + staggerMs(i, 70, 280)}>
+                <figure key={c.label} className="min-w-0" data-reveal="up" data-reveal-delay={760 + staggerMs(i, 110, 400)}>
                   <div className="bg-[#FAFAF7] border border-black/[0.06] p-1 lg:p-4">
                     <img src={c.src} alt={`직접생산확인증명서 (${c.label})`} className="w-full h-[128px] sm:h-[200px] lg:h-[260px] object-contain" loading="lazy" />
                   </div>
@@ -2544,24 +2581,27 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
 // reference처럼 outline capsule(.clients-row-pill, index.css)로 표시하되 reference 실측
 // (44px/20px)보다 절제된 크기로 낮춰 OUR PARTNER.(유일한 main title) 아래 secondary
 // hierarchy임을 분명히 한다. divider도 solid black 대신 옅은 black/20으로 무게를 낮춘다.
-function ClientsRow({ title, desc, items, trackClass }: {
+function ClientsRow({ title, desc, items, trackClass, titleDelay, marqueeDelay }: {
   title: string
   desc: string
   items: ClientLogo[]
   trackClass: 'clients-track-a' | 'clients-track-b'
+  titleDelay: number
+  marqueeDelay: number
 }) {
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-4 lg:gap-[18px]" data-reveal="up">
+      <div className="flex flex-wrap items-center gap-4 lg:gap-[18px]" data-reveal="up" data-reveal-delay={titleDelay}>
         <h3 className="text-black font-bold leading-none" style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}>
           {title}
         </h3>
         <span className="clients-row-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>{desc}</span>
       </div>
-      {/* marquee row 전체를 [data-reveal="marquee"]로 감싼다 — viewport 진입 전에는 track이
-          멈춰 있다가(index.css) row가 fade-in되며 자연스럽게 흐르기 시작한다. 개별 logo reveal은
-          하지 않는다(§완료보고 — continuous marquee와 충돌). */}
-      <div className="clients-marquee mt-10 lg:mt-[52px] py-7 lg:py-9 border-b border-black/20" data-reveal="marquee" data-reveal-delay="140">
+      {/* marquee row 전체를 [data-reveal="marquee"]로 감싼다 — chapter observer(threshold 0.35,
+          rootMargin 0)가 title과 별개로 관찰해 row가 실제로 화면에 뚜렷이 들어와야 시작한다.
+          viewport 진입 전에는 track이 멈춰 있다가(index.css) row가 fade-in되며 자연스럽게
+          흐르기 시작한다. 개별 logo reveal은 하지 않는다(§완료보고 — continuous marquee와 충돌). */}
+      <div className="clients-marquee mt-10 lg:mt-[52px] py-7 lg:py-9 border-b border-black/20" data-reveal="marquee" data-reveal-delay={marqueeDelay}>
         <div className={`clients-track ${trackClass}`}>
           {[...items, ...items].map((c, i) => (
             <ClientLogoCell key={`${trackClass}-${c.name}-${i}`} c={c} />
@@ -2592,11 +2632,16 @@ function Clients() {
         <h2 className="text-black font-semibold leading-none" style={{ fontSize: 'clamp(40px, 6.5vw, 80px)' }}>
           <RevealLines lines={['OUR PARTNER.']} />
         </h2>
+        {/* Timeline A — OUR PARTNER.(0)와 같은 화면에 있어 TIME SEQUENCE로 분리: title(300) →
+            marquee(580). Timeline B(Brand)는 Institution row와 화면상 멀리 떨어져 있어 SCROLL
+            POSITION만으로 이미 자연히 늦게 trigger되지만, marquee는 chapter observer(threshold
+            0.35)를 추가로 거쳐 Institution이 화면을 벗어나기 전에는 활성화되지 않는다(§완료보고
+            2차 — §13). Brand 내부는 자기 화면 기준으로 짧게: title(200) → marquee(450). */}
         <div className="mt-16 lg:mt-20">
-          <ClientsRow title="Institution" desc="TAG와 함께한 기관들 입니다" items={INSTITUTION_CLIENTS} trackClass="clients-track-a" />
+          <ClientsRow title="Institution" desc="TAG와 함께한 기관들 입니다" items={INSTITUTION_CLIENTS} trackClass="clients-track-a" titleDelay={300} marqueeDelay={580} />
         </div>
         <div className="mt-16 lg:mt-20">
-          <ClientsRow title="Brand" desc="TAG와 함께한 브랜드들 입니다" items={BRAND_CLIENTS} trackClass="clients-track-b" />
+          <ClientsRow title="Brand" desc="TAG와 함께한 브랜드들 입니다" items={BRAND_CLIENTS} trackClass="clients-track-b" titleDelay={200} marqueeDelay={450} />
         </div>
       </div>
     </section>
@@ -2987,16 +3032,19 @@ function FaqSection() {
           className="text-white"
           style={{ ...FAQ_KR, fontWeight: 800, fontSize: 'clamp(30px, 3.6vw, 56px)', lineHeight: 1.15, letterSpacing: '-0.035em' }}
           data-reveal="up"
-          data-reveal-delay="60"
+          data-reveal-delay="200"
         >
           궁금한 점.
         </h2>
 
-        {/* accordion — 첫 줄 위에도 hairline. 답변 <p> 만 readable width 로 제한.
-            row는 initial stagger reveal만(§완료보고) — open/close 자체 motion은 .faq-panel(index.css)이 담당. */}
+        {/* accordion — 첫 줄 위에도 hairline. 답변 <p> 만 readable width 로 제한. row는 section
+            진입 시점 기준 누적 delay가 아니라 각 row가 자기 scroll position에서 독립적으로
+            observe된다(standard observer) — 빠르게 스크롤하면 이미 viewport에 도달한 row가
+            자연스럽게 바로 이어서 보인다(§완료보고 2차 §14). row 사이 소폭 stagger만 유지.
+            open/close 자체 motion은 .faq-panel(index.css)이 담당. */}
         <div className="mt-8 lg:mt-10 border-t border-white/20">
           {FAQ_QA.map((item, i) => (
-            <div key={i} data-reveal="up" data-reveal-delay={staggerMs(i, 70, 280)}>
+            <div key={i} data-reveal="up" data-reveal-delay={staggerMs(i, 110, 330)}>
               <FaqRow
                 item={item}
                 index={i}
@@ -4482,14 +4530,14 @@ function ScrollSectionNav() {
             className="group relative flex items-center justify-end py-1"
           >
             <span
-              className={`mr-2.5 text-[10px] tracking-[0.08em] uppercase whitespace-nowrap transition-[opacity,transform] duration-[var(--motion-fast)] ease-[var(--ease-out-editorial)] ${isActive ? 'opacity-100 translate-x-0 text-black' : 'opacity-0 translate-x-1.5 group-hover:opacity-60 group-hover:translate-x-0 text-black/70'}`}
+              className={`mr-2.5 text-[10px] tracking-[0.08em] uppercase whitespace-nowrap transition-[opacity,transform] duration-[320ms] ease-[var(--ease-out-editorial)] ${isActive ? 'opacity-100 translate-x-0 text-black' : 'opacity-0 translate-x-1.5 group-hover:opacity-60 group-hover:translate-x-0 text-black/70'}`}
               style={{ fontFamily: 'Noto Sans KR, sans-serif' }}
               aria-hidden
             >
               {item.label}
             </span>
             <span
-              className={`block rounded-full transition-all duration-[var(--motion-fast)] ease-[var(--ease-out-editorial)] ${isActive ? 'w-[6px] h-[6px] bg-black' : 'w-[4px] h-[4px] bg-black/25 group-hover:bg-black/45'}`}
+              className={`block rounded-full transition-all duration-[320ms] ease-[var(--ease-out-editorial)] ${isActive ? 'w-[6px] h-[6px] bg-black' : 'w-[4px] h-[4px] bg-black/25 group-hover:bg-black/45'}`}
               aria-hidden
             />
           </button>

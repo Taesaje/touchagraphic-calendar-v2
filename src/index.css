@@ -22,16 +22,22 @@
    진입 시 절제된 fade/translate, 반복 없는 1회성 reveal)을 Touchagraphic
    editorial 언어(hairline/black-white/큰 typography) 위에 얹는 token
    레이어. 값을 페이지 곳곳에 --duration:.3s 식으로 난립시키지 않고
-   이 4개 duration + 2개 easing만 재사용한다(§완료보고).
+   이 4개 duration + 3개 easing만 재사용한다(§완료보고 2차 패스 —
+   INTERACTION(--ease-out-editorial, 빠름)과 SCROLL REVEAL(--ease-reveal/
+   --ease-soft, 느림)을 명확히 분리했다).
    ══════════════════════════════════════════════════════════════════ */
 :root {
-  --motion-fast: 220ms;     /* hover / button / nav dot */
-  --motion-base: 480ms;     /* card / accordion 류 구조적 전환 */
-  --motion-reveal: 780ms;   /* 기본 section/content reveal */
-  --motion-slow: 1050ms;    /* media settle 등 가장 느린 motion */
+  --motion-fast: 240ms;     /* hover / button / nav dot — INTERACTION, 계속 빠르게 */
+  --motion-base: 620ms;     /* card / accordion 류 구조적 전환 */
+  --motion-reveal: 1000ms;  /* 기본 section/content SCROLL REVEAL — 1차보다 명확히 느리게 */
+  --motion-slow: 1350ms;    /* media settle 등 가장 느린 motion */
   /* 기존 .pf-card/.svc-arrow에 이미 쓰이던 값 — 이 프로젝트의 암묵적
-     editorial ease였다. 이번에 토큰화해서 전역에서 재사용한다. */
+     editorial ease였다. hover/button/nav 같은 INTERACTION 전용으로 남긴다. */
   --ease-out-editorial: cubic-bezier(0.22, 1, 0.36, 1);
+  /* SCROLL REVEAL 전용 — 초반 이동이 --ease-out-editorial만큼 급하지 않아
+     "도착이 빠르다"는 인상 대신 여유 있게 열리는 느낌을 준다(§완료보고,
+     2차 패스 — INTERACTION은 빠르게/REVEAL은 느리게 명확히 구분). */
+  --ease-reveal: cubic-bezier(0.16, 0.8, 0.24, 1);
   --ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -54,8 +60,8 @@
 [data-reveal="up"] {
   opacity: 0;
   transform: translate3d(0, 28px, 0);
-  transition: opacity var(--motion-reveal) var(--ease-out-editorial),
-              transform var(--motion-reveal) var(--ease-out-editorial);
+  transition: opacity var(--motion-reveal) var(--ease-reveal),
+              transform var(--motion-reveal) var(--ease-reveal);
 }
 [data-reveal="up"].is-inview {
   opacity: 1;
@@ -80,7 +86,7 @@
    진입 시 row 전체가 fade-in되며 marquee가 자연스럽게 시작된다. */
 [data-reveal="marquee"] {
   opacity: 0;
-  transition: opacity var(--motion-reveal) var(--ease-out-editorial);
+  transition: opacity var(--motion-reveal) var(--ease-reveal);
 }
 [data-reveal="marquee"].is-inview {
   opacity: 1;
@@ -96,7 +102,7 @@
 [data-reveal="line"] {
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform var(--motion-reveal) var(--ease-out-editorial);
+  transition: transform var(--motion-reveal) var(--ease-reveal);
 }
 [data-reveal="line"].is-inview {
   transform: scaleX(1);
@@ -132,14 +138,20 @@
     animation-play-state: running;
   }
 }
-/* Mobile — reveal distance/시간을 desktop보다 절제한다(§완료보고). */
+/* Mobile — desktop 대비 duration만 약 18%(15~20% 범위) 짧게, distance도 절제한다. major
+   phase 사이 delay(75~80%)는 App.tsx useScrollReveal()의 applyDelay()에서 처리한다(§완료보고
+   2차 패스 — sequence 자체는 유지하고 크기/속도만 줄인다). */
 @media (max-width: 768px) {
   [data-reveal="up"] {
     transform: translate3d(0, 18px, 0);
-    transition-duration: var(--motion-base);
+    transition-duration: calc(var(--motion-reveal) * 0.82);
   }
   .reveal-clip-inner {
-    transition-duration: var(--motion-base);
+    transition-duration: calc(var(--motion-reveal) * 0.82);
+  }
+  [data-reveal="marquee"],
+  [data-reveal="line"] {
+    transition-duration: calc(var(--motion-reveal) * 0.82);
   }
 }
 
