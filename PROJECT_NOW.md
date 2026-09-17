@@ -53,15 +53,12 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
   - `/inquiry?type=estimate`(InquiryPage)도 같은 `COVER_DESIGN_FAMILIES`/`INNER_DESIGNS`/`DesignGrid`를
     공유하므로 이미지·framing이 자동으로 동일하게 반영됨(중복 데이터 없음). 단 "6개 중 1개 선택"
     sublabel 위계 변경은 InquiryPage에는 적용 안 됨(원래 그 문구 자체가 없었음).
-- Landing Clients 섹션(`src/App.tsx` `Clients`/`ClientsRow`/`ClientLogoCell`, `src/index.css` `.cl-logo`/
-  `.cl-logo-blend`/`.cl-logo-denoise`/`.clients-marquee`/`.clients-pill`) — touchagraphic.com
-  about-us 레퍼런스의 Institution/Brand 두 `.marquee-container` 구조를 그대로 재현(2026-09-17,
-  이전의 "Clients 제목 + 6/6 무구분 2-row" 버전은 폐기).
-  - `Clients` 공통 제목/서브카피 제거, Institution부터 바로 시작. 각 그룹은 제목(Institution/Brand,
-    Latin) + 검정 1px outline capsule 설명(`.clients-pill`: "TAG와 함께한 기관들 입니다" /
-    "TAG와 함께한 브랜드들 입니다") + 자체 CSS marquee + 하단 divider 순서.
-  - 로고는 `INSTITUTION_CLIENTS`/`BRAND_CLIENTS`(`CLIENTS` 원본 배열에서 실제 기관/기업 성격 기준
-    필터링, 7/5) — 개수를 억지로 맞추지 않음.
+- Landing Clients 섹션(`src/App.tsx` `Clients`/`ClientLogoCell`, `src/index.css` `.cl-logo`/
+  `.cl-logo-blend`/`.cl-logo-denoise`/`.clients-marquee`) — 하나의 통합 고객사 섹션(2026-09-17,
+  Institution/Brand 의미적 2-section 구조는 폐기).
+  - 제목은 "TAG와 함께한 고객들 입니다" 하나만(section heading, pill 아님). `CLIENTS` 원본 배열
+    순서 그대로 반으로 나눠 시각적으로만 2개의 logo row(기관/브랜드 구분 아님, 단순 배치).
+    두 row 사이 divider 없음(여백만), 마지막 row 아래에만 divider 유지.
   - marquee는 라이브러리 없이 순수 CSS transform(두 row 속도 42s/47s, 오른쪽→왼쪽, hover 시 해당
     row만 pause, `prefers-reduced-motion` 지원). 원본 브랜드 컬러 그대로 표시(grayscale/opacity감소/
     blend colorization 없음 — `.cl-logo-blend`는 로고에 내장된 불투명 흰 배경 제거에만 사용).
