@@ -491,3 +491,74 @@ body {
     animation: none;
   }
 }
+
+/* ── Header hover shadow(§Header/Hero/Cursor refinement) ─────────────────────
+   k-artfestival.com 실측: header{box-shadow: rgba(0,0,0,0) 0 5px 10px} →
+   header:hover{box-shadow: rgba(0,0,0,0.1) 0 5px 10px}, transition: box-shadow
+   .3s ease-in-out. alpha만 바뀌는 동일 shape로 시작값을 잡아야 box-shadow가
+   부드럽게 interpolate된다(모양이 다르면 급격히 전환됨). 여기서는 그 기법을
+   그대로 쓰되 "그림자"보다 "얇은 공기층"에 가깝도록 더 옅은 alpha로 조정. */
+#site-header {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0);
+  transition: box-shadow 320ms var(--ease-out-editorial);
+}
+@media (hover: hover) and (pointer: fine) {
+  #site-header:hover {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.055);
+  }
+}
+
+/* ── Brand cursor(§Custom cursor) ─────────────────────────────────────────────
+   touchagraphic.com 실측: 30×30px fixed div, translate(-50%,-50%)로 pointer에
+   중심 정렬, transition-duration 0(=trailing 없이 1:1 추적), hover 시
+   scale이 아니라 0.8s linear infinite rotate. 위치는 JS(rAF)가 translate3d로
+   직접 쓰고, 회전은 별도 inner element에 CSS class로 걸어 두 transform이
+   충돌하지 않게 분리한다. */
+.brand-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 2147483647;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  will-change: transform;
+}
+.brand-cursor.is-visible {
+  opacity: 1;
+}
+.brand-cursor.is-over-field {
+  opacity: 0;
+}
+.brand-cursor-symbol {
+  width: 100%;
+  height: 100%;
+  background: url('/brand/touchagraphic-symbol.png') center center / contain no-repeat;
+}
+.brand-cursor-symbol.is-interactive {
+  animation: pf-spin 0.8s linear infinite;
+}
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body {
+    cursor: none;
+  }
+  input,
+  textarea,
+  select,
+  [contenteditable='true'] {
+    cursor: auto;
+  }
+}
+@media (hover: none), (pointer: coarse) {
+  .brand-cursor {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-cursor-symbol.is-interactive {
+    animation: none;
+  }
+}

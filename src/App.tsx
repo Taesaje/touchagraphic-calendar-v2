@@ -658,6 +658,69 @@ const HEADER_NAV = [
   { label: '견적 계산하기', href: '#estimator', targetId: 'estimator-scroll-target' },
 ]
 
+// ── 브랜드 커서 ───────────────────────────────────────────────────────────────
+// touchagraphic.com 공식 홈페이지 실측(§완료보고 — Header/Hero/Cursor refinement) 그대로 재현:
+// 30×30px, public/brand/touchagraphic-symbol.png(Header 로고와 동일한 CMYK 4분할 원형 심볼),
+// pointer에 trailing 없이 1:1로 붙고(공식 사이트 transition-duration:0 확인), hover 시 scale이
+// 아니라 0.8s linear infinite rotate(공식 사이트 .samdeok-cursor.active 규칙 확인). desktop
+// fine-pointer에서만 mount하고(터치 기기는 DOM 자체를 렌더하지 않음), position은 React state가
+// 아니라 ref + rAF + translate3d로만 갱신해 매 pointermove마다 리렌더가 발생하지 않게 한다.
+function BrandCursor() {
+  const [enabled] = useState(() => typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!enabled) return
+    const root = rootRef.current
+    const inner = innerRef.current
+    if (!root || !inner) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let hasMoved = false
+    let rafId: number | null = null
+    let x = 0
+    let y = 0
+
+    function flush() {
+      rafId = null
+      root!.style.transform = `translate3d(${x - 15}px, ${y - 15}px, 0)`
+    }
+    function onPointerMove(e: PointerEvent) {
+      x = e.clientX
+      y = e.clientY
+      if (!hasMoved) {
+        hasMoved = true
+        root!.classList.add('is-visible')
+      }
+      const target = e.target as Element | null
+      const overField = !!target?.closest?.('input, textarea, select, [contenteditable="true"]')
+      const overInteractive = !overField && !!target?.closest?.('a, button, [role="button"]')
+      root!.classList.toggle('is-over-field', overField)
+      inner!.classList.toggle('is-interactive', overInteractive && !reduce)
+      if (rafId == null) rafId = requestAnimationFrame(flush)
+    }
+    function onLeave() { root!.classList.remove('is-visible') }
+    function onEnter() { if (hasMoved) root!.classList.add('is-visible') }
+
+    document.addEventListener('pointermove', onPointerMove, { passive: true })
+    document.documentElement.addEventListener('mouseleave', onLeave)
+    document.documentElement.addEventListener('mouseenter', onEnter)
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove)
+      document.documentElement.removeEventListener('mouseleave', onLeave)
+      document.documentElement.removeEventListener('mouseenter', onEnter)
+      if (rafId != null) cancelAnimationFrame(rafId)
+    }
+  }, [enabled])
+
+  if (!enabled) return null
+  return (
+    <div ref={rootRef} className="brand-cursor" aria-hidden="true">
+      <div ref={innerRef} className="brand-cursor-symbol" />
+    </div>
+  )
+}
+
 // nav 클릭 시 target 이 고정 Header 아래 적절한 여백을 두고 화면 상단에 오도록 스크롤.
 // target 엘리먼트에 지정된 CSS scroll-margin-top(반응형 헤더 높이 반영)을 네이티브
 // scrollIntoView 가 그대로 존중하므로, 헤더 높이를 JS 에서 다시 계산하지 않아도 된다.
@@ -705,7 +768,7 @@ function Header({ page = 'landing', navigate }: { page?: 'landing' | 'portfolio'
   }
   const fontKr = { fontFamily: 'Noto Sans KR, sans-serif' }
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-black/[0.07]">
+    <header id="site-header" className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm">
       <div className={`${SHELL} h-[64px] lg:h-[96px] grid grid-cols-[1fr_auto_1fr] items-center gap-6`}>
         {/* 좌: 브랜드 심볼 + 워드마크 lock-up — public/brand/touchagraphic-symbol.png(CMYK 4분할 원형
             심볼, 색상/비율/black line 그대로) + 기존 텍스트 워드마크를 하나의 Home 버튼으로 묶는다.
@@ -776,13 +839,11 @@ function Hero() {
   return (
     <section id="hero" className="bg-white">
       <div className={SHELL}>
-        {/* 상단 pt = 고정 헤더 높이 + Header→Hero 여백. media-palette.co.kr 첫 화면을 실측(헤더 높이·
-            eyebrow까지 거리)해보면 이전 값(112/200)과 절대 gap 자체는 비슷했지만, 그 사이트는 이 여백을
-            "의도적으로 짧게" 쓰고 헤드라인 쪽에 밀도를 더 준다 — 그래서 여기서도 여백을 확실히 줄이되
-            완전히 붙이지는 않는다(editorial Hero 톤 유지). 하단 pb: 2026-09-07 refinement — Hero→Portfolio
-            전환을 좀 더 빠르게 이어지도록 축소(80→56 / 44→36, Portfolio 쪽 pt 축소와 함께 적용. 하단은
-            이번에 다시 건드리지 않음). */}
-        <div className="pt-[96px] lg:pt-[152px] pb-[36px] lg:pb-[56px]">
+        {/* 상단 pt = 고정 헤더 높이(64/96px) + Header→Hero 여백. §Header/Hero/Cursor refinement —
+            header 밑 divider를 없애면서 header와 Hero가 하나의 canvas로 이어지되, 곧바로 붙어
+            보이지 않도록 여백을 75~110px 범위(desktop)로 넓힘(기존 56px → 90px). mobile은 비례해
+            32px → 48px. 하단 pb는 이번 작업 범위 밖이라 그대로 유지. */}
+        <div className="pt-[112px] lg:pt-[186px] pb-[36px] lg:pb-[56px]">
           {/* 2026-09-07 refinement — wide desktop(1600px+)에서 좌측 headline과 우측 supporting
               copy 사이 gutter가 실측 1000px+ 로 벌어져 두 블록이 "떠 있는" 것처럼 보이던 문제를
               u-content-max(1600px 캡)로 해결. 좌측 시작선(.u-shell)은 그대로 유지. */}
@@ -4679,22 +4740,23 @@ export default function App() {
   }
 
   if (route === '/portfolio') {
-    return <PortfolioPage navigate={navigate} />
+    return <><BrandCursor /><PortfolioPage navigate={navigate} /></>
   }
 
   {
     const detailMatch = route.match(/^\/portfolio\/(\d+)$/)
     if (detailMatch) {
-      return <PortfolioDetailPage idx={Number(detailMatch[1])} navigate={navigate} />
+      return <><BrandCursor /><PortfolioDetailPage idx={Number(detailMatch[1])} navigate={navigate} /></>
     }
   }
 
   if (route === '/inquiry') {
-    return <InquiryPage navigate={navigate} search={routeSearch} estimate={estimateSnapshot} />
+    return <><BrandCursor /><InquiryPage navigate={navigate} search={routeSearch} estimate={estimateSnapshot} /></>
   }
 
   return (
     <div className="min-h-screen bg-white">
+      <BrandCursor />
       <Header page="landing" navigate={navigate} />
       <ScrollSectionNav />
       <Hero />
