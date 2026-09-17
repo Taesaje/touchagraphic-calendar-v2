@@ -4087,6 +4087,14 @@ function RequiredDot() {
   return <span className="inline-block w-[5px] h-[5px] rounded-full align-middle ml-1" style={{ background: '#DB438F' }} aria-hidden />
 }
 
+// Inquiry 전용 표시 라벨 — COVER_DESIGN_FAMILIES.name("붉은양 일러스트" / "2027 그래픽")은
+// Estimator 표기 그대로 유지하고, 이 페이지의 단순화된 text-only 선택지에서만 짧은 이름을 쓴다.
+// 저장되는 실제 value는 family.id/name 그대로라 estimator와 호환된다.
+const BASIC_DESIGN_LABELS: Record<string, string> = {
+  'red-sheep': '불꽃양',
+  '2027-graphic': '그래픽 2026',
+}
+
 function InquiryPage({ navigate, search, estimate }: {
   navigate: (path: string, opts?: { scrollTo?: string }) => void
   search: string
@@ -4361,47 +4369,46 @@ function InquiryPage({ navigate, search, estimate }: {
 
                 {genTierData && (
                   <>
-                    {/* 베이직 — Estimator 와 동일한 표지/내지 실제 디자인 선택(§3·4) */}
+                    {/* 베이직 — Inquiry는 견적 계산기처럼 시안 6개를 이미지로 비교하는 자리가
+                        아니라 상담에 필요한 핵심 정보만 빠르게 받는 자리라, 표지/내지 디자인을
+                        family(계열) 하나만 텍스트로 고르게 단순화한다(§완료보고 — 상담문의 베이직
+                        디자인 선택 단순화). DesignGrid(이미지 6개 grid + 확대 버튼)는 렌더하지
+                        않지만 COVER_DESIGN_FAMILIES/INNER_DESIGNS/DesignGrid 자체는 Estimator가
+                        그대로 쓰므로 삭제하지 않는다. 내부 저장 value(genCoverFamilyId → family.id,
+                        결국 payload의 cover_style = family.name)는 기존 estimator와 동일하게
+                        유지하고, "불꽃양"/"그래픽 2026"은 이 페이지에서만 쓰는 표시용 라벨이다.
+                        genCoverDesignId/genInnerDesignId는 이 화면에서 더 이상 선택하지 않으므로
+                        항상 null → payload의 cover_design/inner_design은 빈 문자열로 남는다(기존
+                        payload 구조 변경 없음). */}
                     {genIsBasic && (
-                      <>
-                        <div className="mb-8">
-                          <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>표지 스타일</p>
-                          <div className="flex flex-wrap gap-3 mb-4">
-                            {COVER_DESIGN_FAMILIES.map(f => {
-                              const on = genCoverFamilyId === f.id
-                              return (
-                                <button
-                                  key={f.id}
-                                  type="button"
-                                  onClick={() => handleGenCoverFamily(f.id)}
-                                  className="flex items-center gap-2.5 text-left"
-                                  style={{
-                                    padding: '13px 18px',
-                                    border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
-                                    background: on ? CFG_SEL_BG : '#ffffff',
-                                    transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
-                                  }}
-                                  onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
-                                  onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
-                                >
-                                  <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{f.name}</span>
-                                  <CheckDisc on={on} />
-                                </button>
-                              )
-                            })}
-                          </div>
-                          {genCoverFamily ? (
-                            <DesignGrid designs={genCoverFamily.designs} selectedId={genCoverDesignId} onSelect={setGenCoverDesignId} />
-                          ) : (
-                            <p className="text-[12.5px] text-black/45 leading-[1.6]" style={fontKr}>표지 계열을 먼저 선택하면 실제 시안 6개가 표시됩니다.</p>
-                          )}
+                      <div className="mb-8">
+                        <p className="text-[12.5px] font-semibold text-black mb-1.5" style={fontKr}>표지 및 내지 디자인</p>
+                        <p className="text-[12px] text-black/45 mb-3" style={fontKr}>베이직 제작에 사용할 디자인 스타일을 선택해 주세요.</p>
+                        <div className="flex flex-wrap gap-3">
+                          {COVER_DESIGN_FAMILIES.map(f => {
+                            const on = genCoverFamilyId === f.id
+                            return (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => handleGenCoverFamily(f.id)}
+                                className="flex items-center gap-2.5 text-left"
+                                style={{
+                                  padding: '13px 18px',
+                                  border: on ? CFG_SEL_BORDER : CFG_REST_BORDER,
+                                  background: on ? CFG_SEL_BG : '#ffffff',
+                                  transition: `border-color 160ms ${CFG_EASE}, background 160ms ${CFG_EASE}`,
+                                }}
+                                onMouseEnter={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = CFG_HOVER_BORDER }}
+                                onMouseLeave={e => { if (!on) (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(26,26,26,0.18)' }}
+                              >
+                                <span className="text-[13px] font-medium text-ink break-keep" style={CFG_KR}>{BASIC_DESIGN_LABELS[f.id] ?? f.name}</span>
+                                <CheckDisc on={on} />
+                              </button>
+                            )
+                          })}
                         </div>
-
-                        <div className="mb-8">
-                          <p className="text-[12.5px] font-semibold text-black mb-3" style={fontKr}>내지 디자인</p>
-                          <DesignGrid designs={INNER_DESIGNS} selectedId={genInnerDesignId} onSelect={setGenInnerDesignId} />
-                        </div>
-                      </>
+                      </div>
                     )}
 
                     {/* 사이즈 — 등급별 정책(베이직: 기성 4종 / 커스텀·하이앤드: 기성 4종 + 별도 사이즈) */}
