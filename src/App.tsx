@@ -2306,13 +2306,13 @@ type ClientLogo = {
 const CLIENTS: ClientLogo[] = [
   // 1행 = 기관, 2행 = 기업, 3행 = 나머지(순서 요청대로)
   { name: '함평군 농업기술센터',       src: clHampyeong,    scale: 1 },
-  { name: '한국수목원정원관리원',       src: clKoagi,        scale: 1.15 },
-  { name: '대한상공회의소',           src: clKorcham,      scale: 1.7, denoise: true },
+  { name: '한국수목원정원관리원',       src: clKoagi,        scale: 1.05 },
+  { name: '대한상공회의소',           src: clKorcham,      scale: 1.15, denoise: true },
   { name: '경기도중독관리통합지원센터', src: clGcamc,        scale: 1 },
   { name: '아이디어두잇',             ideaSrc: clIdeadoitIdea, doitSrc: clIdeadoitDoit },
   { name: '설빙',                   src: clSulbing,      scale: 1 },
   { name: '동아제약',                src: clDongaPharm,   scale: 1 },
-  { name: '이글루코퍼레이션',          src: clIgloo,        scale: 1.8, blend: true },
+  { name: '이글루코퍼레이션',          src: clIgloo,        scale: 1.15, blend: true },
   { name: '한국가스기술공사',          src: clKogasTech,    scale: 1 },
   { name: '한국환경산업기술원',        src: clKeiti,        scale: 1 },
   { name: '세종스포츠정형외과',        src: clSejongSports, scale: 1 },
@@ -2408,10 +2408,14 @@ function CertificationSection() {
 // 값으로만 보정한다.
 function ClientLogoCell({ c }: { c: ClientLogo }) {
   const scale = c.scale ?? 1
+  // reference처럼 "넓은 여백 안에 작은 로고"가 되도록 cell(50~60px)보다 실제 로고 표시 높이를
+  // 더 낮게 잡고(34~48px), max-width로 IDEA DO IT/KEITI 같은 가로로 긴 로고가 row를 지배하지
+  // 않게 제한한다(§완료보고).
+  const logoSize = 'max-h-[30px] lg:max-h-[42px] max-w-[200px] lg:max-w-[240px]'
   return (
-    <div className="h-[52px] lg:h-[80px] flex items-center justify-center shrink-0 px-8 lg:px-14">
+    <div className="h-[44px] lg:h-[58px] flex items-center justify-center shrink-0 px-7 lg:px-[52px]">
       {c.ideaSrc && c.doitSrc ? (
-        <div className="flex items-center gap-2 lg:gap-2.5 h-full">
+        <div className={`flex items-center gap-2 lg:gap-2.5 h-full ${logoSize}`}>
           <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" draggable={false} />
           <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" draggable={false} />
         </div>
@@ -2420,7 +2424,7 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
         // export 시 실수로 같이 포함돼 있어 alpha-cut(반투명 기준)으로 안 지워진다. 재제작 대신
         // overflow-hidden 창 안에서 원본을 살짝(4%) 더 확대해 그 1px 테두리만 밖으로 밀어낸다 —
         // 로고 내용 자체는 원본 그대로.
-        <div className="h-full w-auto overflow-hidden flex items-center justify-center">
+        <div className={`overflow-hidden flex items-center justify-center ${logoSize}`}>
           <img
             src={c.src}
             alt={c.name}
@@ -2434,7 +2438,7 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
           src={c.src}
           alt={c.name}
           draggable={false}
-          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} max-h-full w-auto object-contain`}
+          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} ${logoSize} w-auto object-contain`}
           style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
         />
       )}
@@ -2460,22 +2464,21 @@ function Clients() {
         </filter>
       </svg>
       <div className={SHELL}>
-        <h2
-          className="text-black font-bold leading-[1.15]"
-          style={{ fontSize: 'clamp(30px, 3vw, 44px)', fontFamily: 'Noto Sans KR, sans-serif' }}
-        >
+        {/* 큰 heading이 아니라 reference의 editorial capsule label(index.css .clients-pill) —
+            이 영역 전체의 작지만 명확한 제목 역할(§완료보고). */}
+        <span className="clients-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
           TAG와 함께한 고객들 입니다
-        </h2>
-        {/* 두 row 사이에는 구분선 없이 여백만 둔다 — 하나의 통합 white field처럼 보이도록.
+        </span>
+        {/* 두 row 사이에는 구분선 없이 넉넉한 여백만 둔다 — 하나의 통합 white field처럼 보이도록.
             마지막 row 아래 divider만 페이지 리듬을 위해 유지한다. */}
-        <div className="clients-marquee mt-9 lg:mt-12">
+        <div className="clients-marquee mt-16 lg:mt-[70px] py-6 lg:py-[30px]">
           <div className="clients-track clients-track-a">
             {[...rowA, ...rowA].map((c, i) => (
               <ClientLogoCell key={`a-${c.name}-${i}`} c={c} />
             ))}
           </div>
         </div>
-        <div className="clients-marquee mt-10 lg:mt-12 border-b border-black pb-7 lg:pb-9">
+        <div className="clients-marquee mt-6 lg:mt-8 py-6 lg:py-[30px] border-b border-black">
           <div className="clients-track clients-track-b">
             {[...rowB, ...rowB].map((c, i) => (
               <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />

@@ -156,6 +156,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .clients-track { animation: none; }
 }
+/* Clients section label — reference(touchagraphic.com about-us)의 editorial capsule 느낌을
+   가져오되 버튼처럼 보이지 않도록 얇은 1px outline + white bg만 사용(§완료보고). */
+.clients-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border: 1px solid #111;
+  border-radius: 9999px;
+  background: #fff;
+  color: #000;
+  height: 40px;
+  padding: 0 18px;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .clients-pill { height: 44px; padding: 0 20px; font-size: 17px; }
+}
 
 /* Portfolio 전체보기(/portfolio) — category filter 전환 시 짧은 opacity fade만 허용(grid rearrange 없음) */
 .pf-feed-item {
