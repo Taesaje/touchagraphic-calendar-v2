@@ -2406,25 +2406,28 @@ function CertificationSection() {
 // 캔버스에 맞춰 미리 크롭돼 있지 않아 cover를 쓰면 로고가 잘린다. 원본을 임의로 재가공하지 않기
 // 위해 object-contain + height 기준 정렬을 유지한다). 로고별 캔버스 여백 차이는 CLIENTS의 scale
 // 값으로만 보정한다.
+// 고정 logo slot — 모든 로고를 같은 크기의 보이지 않는 프레임(width/height 고정) 안에 놓고
+// object-contain으로 담아 "같은 px 높이"가 아니라 "같은 optical 무게"로 보이게 한다(§완료보고).
+// slot 자체의 폭이 로고 간 가로 gap 역할을 겸해서 별도 px 패딩은 쓰지 않는다.
+const CLIENT_SLOT = 'w-[180px] lg:w-[210px] h-[46px] lg:h-[52px] flex items-center justify-center shrink-0'
+const CLIENT_LOGO_SIZE = 'max-h-[26px] lg:max-h-[34px] max-w-[150px] lg:max-w-[180px]'
 function ClientLogoCell({ c }: { c: ClientLogo }) {
   const scale = c.scale ?? 1
-  // reference처럼 "넓은 여백 안에 작은 로고"가 되도록 cell(50~60px)보다 실제 로고 표시 높이를
-  // 더 낮게 잡고(34~48px), max-width로 IDEA DO IT/KEITI 같은 가로로 긴 로고가 row를 지배하지
-  // 않게 제한한다(§완료보고).
-  const logoSize = 'max-h-[30px] lg:max-h-[42px] max-w-[200px] lg:max-w-[240px]'
   return (
-    <div className="h-[44px] lg:h-[58px] flex items-center justify-center shrink-0 px-7 lg:px-[52px]">
+    <div className={CLIENT_SLOT}>
       {c.ideaSrc && c.doitSrc ? (
-        <div className={`flex items-center gap-2 lg:gap-2.5 h-full ${logoSize}`}>
-          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full w-auto object-contain" draggable={false} />
-          <img src={c.doitSrc} alt="" className="cl-logo h-full w-auto object-contain" draggable={false} />
+        // IDEA/DO IT 두 asset 조합 전체가 다른 로고 하나와 같은 slot 안에 들어가야 하므로,
+        // 개별 이미지 max-width를 slot 폭의 절반 수준으로 나눠 캡한다(§완료보고).
+        <div className="flex items-center gap-1.5 lg:gap-2 max-h-[26px] lg:max-h-[34px]">
+          <img src={c.ideaSrc} alt={c.name} className="cl-logo h-full max-w-[70px] lg:max-w-[85px] w-auto object-contain" draggable={false} />
+          <img src={c.doitSrc} alt="" className="cl-logo h-full max-w-[70px] lg:max-w-[85px] w-auto object-contain" draggable={false} />
         </div>
       ) : c.denoise ? (
         // korcham.png 원본 캔버스 네 변에 1px 불투명(alpha 251~255) 연회색(#cccccc) 테두리가
         // export 시 실수로 같이 포함돼 있어 alpha-cut(반투명 기준)으로 안 지워진다. 재제작 대신
         // overflow-hidden 창 안에서 원본을 살짝(4%) 더 확대해 그 1px 테두리만 밖으로 밀어낸다 —
         // 로고 내용 자체는 원본 그대로.
-        <div className={`overflow-hidden flex items-center justify-center ${logoSize}`}>
+        <div className={`overflow-hidden flex items-center justify-center ${CLIENT_LOGO_SIZE}`}>
           <img
             src={c.src}
             alt={c.name}
@@ -2438,7 +2441,7 @@ function ClientLogoCell({ c }: { c: ClientLogo }) {
           src={c.src}
           alt={c.name}
           draggable={false}
-          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} ${logoSize} w-auto object-contain`}
+          className={`${c.blend ? 'cl-logo-blend' : 'cl-logo'} ${CLIENT_LOGO_SIZE} w-auto object-contain`}
           style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
         />
       )}
@@ -2465,10 +2468,26 @@ function Clients() {
       </svg>
       <div className={SHELL}>
         {/* 큰 heading이 아니라 reference의 editorial capsule label(index.css .clients-pill) —
-            이 영역 전체의 작지만 명확한 제목 역할(§완료보고). */}
-        <span className="clients-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-          TAG와 함께한 고객들 입니다
-        </span>
+            이 영역 전체의 작지만 명확한 제목 역할(§완료보고). 좌우의 CMYK 모티프는 Header에서
+            이미 쓰는 브랜드 심볼(public/brand/touchagraphic-symbol.png)을 그대로 재사용 —
+            새로 그리지 않고 60~70% 크기로 축소만 한다. */}
+        <div className="flex items-center gap-3 lg:gap-4 flex-wrap">
+          <img
+            src="/brand/touchagraphic-symbol.png"
+            alt=""
+            aria-hidden="true"
+            className="h-[15px] w-[15px] lg:h-[20px] lg:w-[20px] shrink-0 object-contain"
+          />
+          <span className="clients-pill" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
+            TAG와 함께한 고객들 입니다
+          </span>
+          <img
+            src="/brand/touchagraphic-symbol.png"
+            alt=""
+            aria-hidden="true"
+            className="h-[15px] w-[15px] lg:h-[20px] lg:w-[20px] shrink-0 object-contain"
+          />
+        </div>
         {/* 두 row 사이에는 구분선 없이 넉넉한 여백만 둔다 — 하나의 통합 white field처럼 보이도록.
             마지막 row 아래 divider만 페이지 리듬을 위해 유지한다. */}
         <div className="clients-marquee mt-16 lg:mt-[70px] py-6 lg:py-[30px]">
@@ -2478,7 +2497,7 @@ function Clients() {
             ))}
           </div>
         </div>
-        <div className="clients-marquee mt-6 lg:mt-8 py-6 lg:py-[30px] border-b border-black">
+        <div className="clients-marquee mt-10 lg:mt-16 py-6 lg:py-[30px] border-b border-black">
           <div className="clients-track clients-track-b">
             {[...rowB, ...rowB].map((c, i) => (
               <ClientLogoCell key={`b-${c.name}-${i}`} c={c} />
