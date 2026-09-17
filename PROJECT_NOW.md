@@ -53,6 +53,11 @@ Header → Hero → Portfolio → EstimatorSection → CertificationSection → 
   - `/inquiry?type=estimate`(InquiryPage)도 같은 `COVER_DESIGN_FAMILIES`/`INNER_DESIGNS`/`DesignGrid`를
     공유하므로 이미지·framing이 자동으로 동일하게 반영됨(중복 데이터 없음). 단 "6개 중 1개 선택"
     sublabel 위계 변경은 InquiryPage에는 적용 안 됨(원래 그 문구 자체가 없었음).
+- Landing Clients 섹션(`src/App.tsx` `Clients`/`ClientLogoCell`, `src/index.css` `.cl-logo`/`.cl-logo-blend`/
+  `.clients-marquee`) — 12개 로고를 6/6 두 개의 독립 CSS marquee row(속도 42s/47s, 오른쪽→왼쪽,
+  hover 시 해당 row만 pause, `prefers-reduced-motion` 지원)로 분리하고, 과거 brightness(0)/grayscale(1)로
+  전부 단색 실루엣 처리하던 필터를 제거해 원본 브랜드 컬러 그대로 표시하도록 변경(2026-09-17).
+  row 높이·로고 주변 여백도 확대. 로고 데이터(`CLIENTS`)와 개별 scale 보정값은 변경 없음.
 - `AGENTS.md`에 Engineering Guardrails 추가(작업 위험도별 대응, 기술부채 보고, Architecture Audit 기준 등)
 - Git → Netlify 자동 deploy (origin/v2-redesign push 시 재배포)
 - `npm run publish:v2` — build → safe staging → commit → push 자동화(기존 검증 완료)
@@ -75,6 +80,9 @@ PROJECT_NOW.md에는 파일별 modified/untracked 상태를 저장하지 않는�
 2. "붉은양 일러스트" 표지 계열 실제 시안 6장 이미지 asset 확보 및 연결(현재 "이미지 준비중"
    placeholder 상태) — 경로 규칙은 §6 참고, 확보되면 2027 그래픽과 동일한 방식으로 연결.
 3. Portfolio 랜딩 카드 최종 7개 선정 확정 여부 점검(미확정 상태로 남아있음)
+4. Clients 로고 중 `설빙`(`src/imports/client-logos/sulbing.png`, 원본 163×31px raster)은 확대 표시
+   시 다른 로고보다 해상도가 낮아 상대적으로 흐리게 보일 수 있음 — 공식 SVG 또는 고해상도 원본
+   확보되면 교체 권장(현재 CSS로 억지 확대하지 않고 원본 그대로 사용 중, 기능상 문제 없음).
 
 ## 6. 보호해야 하는 것
 
